@@ -27,7 +27,7 @@ def init_irc_socket():
 
 def irc_join_to_channel(irc, chan, nick):
     if not irc:
-        logging.error('No IRC socket')
+        logging.error('No IRC socket.')
         return False
     try:
         irc.recv(4096) #Setting up the Buffer
@@ -37,6 +37,8 @@ def irc_join_to_channel(irc, chan, nick):
     except socket.error:
         logging.error('Writing to IRC socked failed')
         raise
+    else:
+        return True
 
 
 def irc_command(irc, chan, command, message=None):
@@ -55,14 +57,14 @@ def irc_command(irc, chan, command, message=None):
 def irc_privmsg(irc, chan, msg):
     irc_command(irc, chan, 'PRIVMSG', msg)
 
+
 def publish_link(irc, chan, entry):
     nick = 'hnfeed' #define nick
-    irc_join_to_channel(irc, chan, nick)
-    #message = 'PRIVMSG ' + chan + ' ' + entry['title'] + ' | ' + entry['link']
+    if not irc_join_to_channel(irc, chan, nick):
+        irc = init_irc_socket()
+        irc_join_to_channel(irc, chan, nick)
     message = entry['title'] + ' | ' + entry['link']
-    #irc.send('PRIVMSG ' + chan + ' :' + message + '\r\n') #Send a Message to the  channel
     irc_privmsg(irc, chan, message)
-    #irc.send(message + '\r\n') #Send a Message to the  channel
 
 
 def store_link(db, entry):
@@ -77,6 +79,12 @@ def store_link(db, entry):
         return True
 
 
+def clear_table():
+    logging.debug('DELETE FROM rss')
+    conn.execute("DELETE FROM rss;")
+    conn.commit()
+
+
 def main():
     chan = '#999net'
     conn = sql.connect('hyrss')
@@ -86,20 +94,16 @@ def main():
     while True:
         try:
             if DEBUG:
-                logging.debug('DELETE FROM rss')
-                conn.execute("DELETE FROM rss;")
-                conn.commit()
+                clear_table()
             irc = init_irc_socket()
             feed = feedparser.parse('https://news.ycombinator.com/rss')
             for entry in feed['entries']:
-                title = entry['title']
-                link = entry['link']
                 if store_link(conn, entry):
                     time.sleep(1)
                     publish_link(irc, chan, entry)
                 else:
                     logging.error('Link not stored and not published: ' + entry['title'])
-            time.sleep(10)
+            time.sleep(120)
         except Exception:
             conn.close()
             irc_command(irc, 'PART', chan)
