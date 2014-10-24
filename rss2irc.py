@@ -52,6 +52,11 @@ def init_irc_socket():
     port = 6667 #Define IRC Server Port
     logging.debug('Connecting to IRC server ' + str(network))
     irc = socket.socket(socket.AF_INET, socket.SOCK_STREAM) #Define  IRC Socket
+    # DEBUG
+    irc.connect((network,port)) #Connect to Server
+    irc.recv(4096) #Setting up the Buffer
+    return irc
+    # END OF DEBUG
     while attempts:
         try:
             irc.connect((network,port)) #Connect to Server
@@ -69,18 +74,18 @@ def irc_join_to_channel(irc, chan, nick):
     if not irc:
         logging.error('No IRC socket.')
         raise IrcSocketError(irc)
+    logging.debug('Entering channel ' + chan + ' as ' + nick)
     try:
         irc.recv(4096) #Setting up the Buffer
-        #irc.send('NICK ' + nick + '\r\n') #Send our Nick(Notice the Concatenation)
-        irc_command(irc, nick, 'NICK')
-        #irc.send('USER artur monitor.stonith.pl bla :Artur\r\n') #Send User Info to the server
-        irc_command(irc, 'artur monitor.stonith.pl bla :Artur', 'USER')
-        #irc.send('JOIN ' + chan + '\r\n') # Join the pre defined channel
-        irc_command(irc, chan, 'JOIN')
+        irc.send('NICK ' + nick + '\r\n') #Send our Nick(Notice the Concatenation)
+        #irc_command(irc, nick, 'NICK')
+        irc.send('USER artur monitor.stonith.pl bla :Artur\r\n') #Send User Info to the server
+        #irc_command(irc, 'artur monitor.stonith.pl bla :Artur', 'USER')
+        irc.send('JOIN ' + chan + '\r\n') # Join the pre defined channel
+        #irc_command(irc, chan, 'JOIN')
     except socket.error:
-        irc = init_irc_socket()
         logging.error('Writing to IRC socked failed')
-        raise
+        raise IrcSocketError
     else:
         return True
 
@@ -163,25 +168,18 @@ def main():
         sys.exit(1)
 
     while True:
+        if DEBUG:
+            clear_table(conn)
         try:
-            if DEBUG:
-                clear_table(conn)
             irc = init_irc_socket()
             logging.debug('Fetching RSS...')
             feed = feedparser.parse('https://news.ycombinator.com/rss')
             for entry in feed['entries']:
-                if store_link(conn, entry):
-                    time.sleep(1)
-                    #if is_published(conn, entry['link']) == 0:
-                    if publish_link(irc, chan, entry):
-                        update_link(conn, link, 1)
-                        logging.notify('Link stored, published and updated: ' + entry['title'])
-                    else:
-                        logging.error('Link not published: ' + entry['title'])
-                    #else:
-                    #    logging.info('Link already published: ' + entry['title'])
-                else:
-                    logging.error('Link not stored: ' + entry['title'])
+                store_link(conn, entry)
+                time.sleep(1)
+                publish_link(irc, chan, entry)
+                update_link(conn, entry['link'], 1)
+                logging.info('Link stored, published and updated: ' + entry['title'])
             time.sleep(120)
         except Exception as e:
             conn.close()
