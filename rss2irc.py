@@ -18,6 +18,9 @@ DEBUG = True
 
 
 def init_irc_socket():
+    """
+    Initiate TCP connection (IP:port)
+    """
     network = "irc.freenode.net" #Define IRC Network
     port = 6667 #Define IRC Server Port
     irc = socket.socket(socket.AF_INET, socket.SOCK_STREAM) #Define  IRC Socket
@@ -26,6 +29,9 @@ def init_irc_socket():
 
 
 def irc_join_to_channel(irc, chan, nick):
+    """
+    Connects to IRC channel, no matter what
+    """
     if not irc:
         logging.error('No IRC socket.')
         return False
@@ -86,14 +92,15 @@ def clear_table():
 
 
 def main():
-    chan = '#999net'
+    chan = '#999net' # channel semi-private
     conn = sql.connect('hyrss')
     if not conn:
         os.exit(1)
 
     while True:
+        irc = None
         try:
-            if DEBUG:
+            if DEBUG: # DEBUG clears table in database
                 clear_table()
             irc = init_irc_socket()
             feed = feedparser.parse('https://news.ycombinator.com/rss')
@@ -104,11 +111,16 @@ def main():
                 else:
                     logging.error('Link not stored and not published: ' + entry['title'])
             time.sleep(120)
-        except Exception:
-            conn.close()
-            irc_command(irc, 'PART', chan)
-            irc.close()
+        except Exception, e:
+            if conn:
+                conn.close()
+            if irc:
+                irc_command(irc, 'PART', chan)
+                irc.close()
+            print("Exception {0}. Exiting...".format(e))
+            break
 
 
 if __name__ == '__main__':
+    # Main invoked only in calling program from shell
     main()
