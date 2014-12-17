@@ -14,7 +14,8 @@ logging.basicConfig(
 )
 
 
-DEBUG = True
+DEBUG = False
+REFRESH_TIME = 300
 
 
 def init_irc_socket():
@@ -24,7 +25,18 @@ def init_irc_socket():
     network = "irc.freenode.net" #Define IRC Network
     port = 6667 #Define IRC Server Port
     irc = socket.socket(socket.AF_INET, socket.SOCK_STREAM) #Define  IRC Socket
-    irc.connect((network,port)) #Connect to Server
+    attempts = 3
+    while attempts:
+        try:
+            irc.connect((network,port)) #Connect to Server
+        except socket.error:
+            # Try again
+            time.sleep(REFRESH_TIME/2)
+            attempts -= 1
+        else:
+            break
+    else:
+        raise
     return irc
 
 
@@ -71,21 +83,36 @@ def publish_link(irc, chan, entry):
         irc_join_to_channel(irc, chan, nick)
     message = entry['title'] + ' | ' + entry['link']
     irc_privmsg(irc, chan, message)
+    return True # possible exception makes it nonTrue
 
 
 def store_link(db, entry):
     logging.debug('Storing link ' + entry['title'])
     try:
-        db.execute("INSERT INTO rss VALUES('%s', '%s');" % (entry['title'], entry['link']))
+        db.execute("INSERT INTO rss VALUES('%s', '%s', '%s');" % (entry['title'], entry['link'], 0))
         db.commit()
-    except (sql.OperationalError, sql.ProgrammingError):
+    except (sql.OperationalError, sql.ProgrammingError, sql.IntegrityError), e:
         logging.error('Storing link failed: ' + entry['title'])
+        print e
         return False
     else:
         return True
 
+def set_link_published(db, entry):
+    title = entry['title']
+    link  = entry['link']
+    logging.debug(u'Link on IRC, setting it as published in database. ({0})'.format(title))
+    try:
+        db.execute("UPDATE rss SET published = '%s';" % 1)
+        db.commit()
+    except (sql.OperationalError, sql.ProgrammingError), e:
+        logging.error('Setting link as published failed: ' + title)
+        print e
+        return False
+    else:
+        return True
 
-def clear_table():
+def clear_table(conn):
     logging.debug('DELETE FROM rss')
     conn.execute("DELETE FROM rss;")
     conn.commit()
@@ -96,21 +123,23 @@ def main():
     conn = sql.connect('hyrss')
     if not conn:
         os.exit(1)
+    logging.debug('conn is {0}'.format(conn))
 
     while True:
         irc = None
         try:
             if DEBUG: # DEBUG clears table in database
-                clear_table()
+                clear_table(conn)
             irc = init_irc_socket()
             feed = feedparser.parse('https://news.ycombinator.com/rss')
             for entry in feed['entries']:
                 if store_link(conn, entry):
                     time.sleep(1)
-                    publish_link(irc, chan, entry)
+                    if publish_link(irc, chan, entry):
+                        set_link_published(conn, entry)
                 else:
                     logging.error('Link not stored and not published: ' + entry['title'])
-            time.sleep(120)
+            time.sleep(REFRESH_TIME)
         except Exception, e:
             if conn:
                 conn.close()
@@ -118,7 +147,7 @@ def main():
                 irc_command(irc, 'PART', chan)
                 irc.close()
             print("Exception {0}. Exiting...".format(e))
-            break
+            raise
 
 
 if __name__ == '__main__':
