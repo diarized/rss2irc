@@ -122,6 +122,7 @@ def main():
     chan = '#999net' # channel semi-private
     conn = sql.connect('hyrss')
     if not conn:
+        logging.error('Sqlite3 db file disappeared or locked.')
         os.exit(1)
     logging.debug('conn is {0}'.format(conn))
 
