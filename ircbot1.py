@@ -14,6 +14,7 @@ class IRCConnector(threading.Thread):
         self.realname = "superbot"
         self.hostname = "supermatt.net"
         self.botname = "SPRBT"
+        self.kill_received = False
         threading.Thread.__init__(self)
 
     def output(self, message):
@@ -40,8 +41,7 @@ class IRCConnector(threading.Thread):
         self.s.send(message1)
         self.s.send(message2)
 
-
-        while True:
+        while not self.kill_received:
             try:
                 line = self.s.recv(500)
             except socket.error:
@@ -58,7 +58,7 @@ class IRCConnector(threading.Thread):
 
             if re.search(":End of /MOTD command.", line):
                 for chan in self.channels:
-                    joinchannel = "JOIN %s\n" %chan
+                    joinchannel = "JOIN {0}\n".format(chan)
                     self.output(joinchannel)
                     self.s.send(joinchannel)
 
@@ -85,7 +85,9 @@ class IRCConnector(threading.Thread):
                 sys.exit()
 
 
+
 def main():
+    threads = []
     irc_connections = [{
         "host": "irc.freenode.net",
         "port": 6667,
@@ -101,13 +103,11 @@ def main():
     for irc in irc_connections:
         irc_thread = IRCConnector(irc['host'], irc['port'], irc['channels'])
         threads.append(irc_thread)
-        irc_thread.daemon = True
+        #irc_thread.daemon = True
         irc_thread.start()
 
-threads = []
-if __name__ == "__main__":
-    main()
-    while True:
+    while len(threads) > 0:
+    # Main thread must keep going to process signals
         try:
             threads = [t.join(1) for t in threads if t is not None and t.isAlive()]
         except KeyboardInterrupt:
@@ -115,3 +115,5 @@ if __name__ == "__main__":
             for t in threads:
                 t.kill_received = True
 
+if __name__ == "__main__":
+    main()
