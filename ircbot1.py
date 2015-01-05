@@ -3,6 +3,7 @@
 import socket
 import sys
 import re
+import time
 from datetime import datetime
 import threading
 import logging
@@ -156,21 +157,45 @@ class IRCChannel(threading.Thread):
     def run(self):
         logging.debug("Thread of class IRCChannel started: '{0}'".format(self.name))
         while not self.kill_received.is_set():
+            logging.debug("Reading from queue in thread '{0}'".format(self.name))
             username, lower = self.queue.get()
+            logging.debug("Read ('{0}', '{1}') from queue in thread {2}".format(username, lower, self.name))
             if re.search("hello.*sprbt", lower):
                 message = "Hello there, %s" %username
                 self.say(message, self.channel_name)
-
-            if lower == "$date":
+            elif lower == "$date":
                 self.say("{0}: the time is {1}".format(username, datetime.now()))
-
-            if lower== "$kill":
+            elif lower== "$kill":
                 self.socket.send("QUIT :Bot quit\n")
                 [t.kill_received.set() for t in threading.enumerate()]
                 self.irc_conn.disconnect()
                 sys.exit()
+            else:
+                self.say(lower)
 
             self.queue.task_done()
+
+
+def get_thread(threads, server, channel):
+    for irc_thread in threads:
+        logging.debug('Seeking IRC thread {0} for channel threads'.format(irc_thread.name))
+        if irc_thread.host == server:
+            logging.debug('Found thread on IRC server {0}'.format(server))
+            try:
+                chan_thread = irc_thread.channel_threads[channel]
+            except KeyError:
+                logging.debug('No channel {0} on server {1}'.format(channel, server))
+                pass
+            else:
+                logging.debug('Found thread {0} on IRC server {1}'.format(channel, server))
+                return chan_thread
+    logging.debug('Thread on IRC server {0} not found'.format(server))
+    return None
+
+
+def put_in_queue(thread, message, recipient='noneo'):
+    logging.debug('Putting values ({0}, {1}) in queue of thread {2}'.format(recipient, message, thread.queue))
+    thread.queue.put((recipient, message))
 
 
 def main():
@@ -187,6 +212,12 @@ def main():
         threads.append(irc_thread)
         irc_thread.daemon = True
         irc_thread.start()
+
+    time.sleep(6)
+    thr = get_thread(threads, 'irc.freenode.net', '#999net')
+    for i in xrange(5):
+        put_in_queue(thr, "{0} HAHA".format(i))
+        time.sleep(3)
 
     logging.debug("All server threads started.")
     [t.join() for t in threads]
