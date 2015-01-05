@@ -6,6 +6,7 @@ import re
 from datetime import datetime
 import threading
 import logging
+import Queue
 
 logging.basicConfig(
         level=logging.DEBUG,
@@ -21,14 +22,13 @@ class IRCConnector(threading.Thread):
         self.realname = "superbot"
         self.hostname = "supermatt.net"
         self.botname = "SPRBT"
-        self.kill_received = threading.Event()
+        self.joinable = False
+        self.channel_queues = {}
+        self.channel_threads = []
         threading.Thread.__init__(self)
 
     def output(self, message):
         logging.info("Server: %s\nMessage:%s\n" % (self.host, message))
-
-    def say(self, message, channel):
-        self.s.send("PRIVMSG %s :%s\n" % (channel, message))
 
     def run(self):
         try:
@@ -48,6 +48,14 @@ class IRCConnector(threading.Thread):
         self.s.send(message1)
         self.s.send(message2)
 
+        for chan in self.channels:
+            q = Queue.Queue()
+            self.channel_queues[chan] = q
+            channel_thread = IRCChannel(self.s, chan, q)
+            self.channel_threads.append(channel_thread)
+            channel_thread.daemon = True
+            channel_thread.start()
+
         while True:
             try:
                 line = self.s.recv(500)
@@ -64,6 +72,7 @@ class IRCConnector(threading.Thread):
                 self.s.send(pong)
 
             if re.search(":End of /MOTD command.", line):
+                self.joinable = True
                 for chan in self.channels:
                     joinchannel = "JOIN {0}\n".format(chan)
                     self.output(joinchannel)
@@ -77,20 +86,40 @@ class IRCConnector(threading.Thread):
                 messagelist = details[3:]
                 message = " ".join(messagelist)[1:]
                 lower = message.lower()
-
-                if re.search("hello.*sprbt", lower):
-                    message = "Hello there, %s" %username
-                    self.say(message, channel)
-
-                if lower == "$date":
-                    self.say("%s: the time is %s" %(username, datetime.now()), channel)
-
-                if lower== "$kill":
-                    self.s.send("QUIT :Bot quit\n")
+                logging.debug("Putting '{0}' into channel {1} queue".format(lower, channel))
+                try:
+                    self.channel_queues[channel].put((username, lower))
+                except KeyError:
+                    logging.warning("No channel {0} to put message '{1}' on".format(channel, lower))
 
             if re.search(":Closing Link:", line):
                 sys.exit()
 
+
+class IRCChannel(threading.Thread):
+    def __init__(self, s, chan, q):
+        self.socket = s
+        self.channel_name = chan
+        self.queue = q
+        threading.Thread.__init__(self)
+
+    def say(self, message):
+        logging.debug("Saying '{0}' on channel {1}".format(message, self.channel_name))
+        self.socket.send("PRIVMSG %s :%s\n" % (self.channel_name, message))
+
+    def run(self):
+        while True:
+            username, lower = q.get()
+            if re.search("hello.*sprbt", lower):
+                message = "Hello there, %s" %username
+                self.say(message, self.channel_name)
+
+            if lower == "$date":
+                self.say("%s: the time is %s" %(username, datetime.now()), self.channel_name)
+
+            if lower== "$kill":
+                self.socket.send("QUIT :Bot quit\n")
+                self.socket.close()
 
 
 def main():
