@@ -48,7 +48,7 @@ class IRCConnector(threading.Thread):
         self.s.send(message1)
         self.s.send(message2)
 
-        while not self.kill_received.is_set():
+        while True:
             try:
                 line = self.s.recv(500)
             except socket.error:
