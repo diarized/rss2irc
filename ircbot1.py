@@ -14,6 +14,10 @@ logging.basicConfig(
         format='[%(asctime)s %(levelname)s] (%(threadName)-10s) %(message)s',
 )
 
+DEBUG = True
+REFRESH_TIME = 30
+RECONNECT_TIME = REFRESH_TIME/2
+
 class IRCConnector(threading.Thread):
     def __init__ (self, host, port, channels):
         self.host = host
@@ -24,12 +28,48 @@ class IRCConnector(threading.Thread):
         self.hostname = "supermatt.net"
         self.botname = "SPRBT"
         self.channel_queues = {}
-        self.channel_threads = []
+        self.channel_threads = {}
         self.kill_received = threading.Event()
         threading.Thread.__init__(self, name=host)
 
     def output(self, message):
         logging.info("Server: %s\nMessage:%s\n" % (self.host, message))
+
+    def disconnect(self):
+        self.s.close()
+        sys.exit()
+
+    def receive(self):
+            try:
+                line = self.s.recv(500)
+            except socket.error:
+                logging.error("Disconnected")
+                [t.join() for t in threading.enumerate()]
+                self.disconnect()
+            if line:
+                return line
+            return None
+
+
+    def connect(self):
+        attempts = 3
+        self.s = socket.socket(socket.AF_INET, socket.SOCK_STREAM) #Define  IRC Socket
+
+        while attempts:
+            try:
+                self.s.connect((self.network,self.port)) #Connect to Server
+            except socket.error:
+                # Try again
+                logging.warning("socket.error: cannot connect to IRC server.")
+                time.sleep(RECONNECT_TIME)
+                attempts -= 1
+            else:
+                logging.debug("connected to IRC server {0}.".format(self.host))
+                break
+        else:
+            error_msg = "socket.error: could not connect to IRC server for {0} secs"
+            logging.error(error_msg.format(RECONNECT_TIME*attempts))
+            sys.exit(1)
 
     def run(self):
         logging.info("Thread of class IRCConnector started: '{0}'".format(self.name))
@@ -54,18 +94,13 @@ class IRCConnector(threading.Thread):
             logging.debug("Building thread for channel {0}".format(chan))
             q = Queue.Queue(10)
             self.channel_queues[chan] = q
-            channel_thread = IRCChannel(self.s, chan, q)
-            self.channel_threads.append(channel_thread)
+            channel_thread = IRCChannel(self, self.s, chan, q)
+            self.channel_threads[chan] = channel_thread
             channel_thread.daemon = True
             channel_thread.start()
 
         while not self.kill_received.is_set():
-            try:
-                line = self.s.recv(500)
-            except socket.error:
-                logging.error("Disconnected")
-                [t.join() for t in threading.enumerate()]
-                sys.exit()
+            line = self.receive()
             if line:
                 self.output(line)
                 logging.debug("Number of threads alive: {0}".format(threading.active_count()))
@@ -101,12 +136,13 @@ class IRCConnector(threading.Thread):
                     logging.warning("No channel {0} to put message '{1}' on".format(channel, lower))
 
             if re.search(":Closing Link:", line):
-                [t.kill_received.set() for t in self.channel_threads]
-                sys.exit()
+                [t.kill_received.set() for t in self.channel_threads.values()]
+                self.disconnect()
 
 
 class IRCChannel(threading.Thread):
-    def __init__(self, s, chan, q):
+    def __init__(self, irc_conn, s, chan, q):
+        self.irc_conn = irc_conn
         self.socket = s
         self.channel_name = chan
         self.queue = q
@@ -130,8 +166,8 @@ class IRCChannel(threading.Thread):
 
             if lower== "$kill":
                 self.socket.send("QUIT :Bot quit\n")
-                self.socket.close()
                 [t.kill_received.set() for t in threading.enumerate()]
+                self.irc_conn.disconnect()
                 sys.exit()
 
             self.queue.task_done()
@@ -144,11 +180,6 @@ def main():
         "port": 6667,
         "channels": ["#999net", "#999ned"]
     },
-#    {
-#        "host": "localhost",
-#        "port": 6667,
-#        "channels": ["#999net", "#999ned"]
-#    },
     ]
 
     for irc in irc_connections:
