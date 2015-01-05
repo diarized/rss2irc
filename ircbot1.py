@@ -1,9 +1,16 @@
 #!/usr/bin/env python
+
 import socket
 import sys
 import re
 from datetime import datetime
 import threading
+import logging
+
+logging.basicConfig(
+        level=logging.DEBUG,
+        format='[%(asctime)s %(levelname)s] (%(threadName)-10s) %(message)s',
+)
 
 class IRCConnector(threading.Thread):
     def __init__ (self, host, port, channels):
@@ -14,11 +21,11 @@ class IRCConnector(threading.Thread):
         self.realname = "superbot"
         self.hostname = "supermatt.net"
         self.botname = "SPRBT"
-        self.kill_received = False
+        self.kill_received = threading.Event()
         threading.Thread.__init__(self)
 
     def output(self, message):
-        print("Server: %s\nMessage:%s\n" % (self.host, message))
+        logging.info("Server: %s\nMessage:%s\n" % (self.host, message))
 
     def say(self, message, channel):
         self.s.send("PRIVMSG %s :%s\n" % (channel, message))
@@ -27,7 +34,7 @@ class IRCConnector(threading.Thread):
         try:
             self.s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
         except socket.error:
-            print 'Failed to create socket'
+            logging.error('Failed to create socket')
             sys.exit()
 
         remote_ip = socket.gethostbyname(self.host)
@@ -41,11 +48,11 @@ class IRCConnector(threading.Thread):
         self.s.send(message1)
         self.s.send(message2)
 
-        while not self.kill_received:
+        while not self.kill_received.is_set():
             try:
                 line = self.s.recv(500)
             except socket.error:
-                print "Disconnected"
+                logging.error("Disconnected")
                 sys.exit()
             if line:
                 self.output(line)
@@ -76,7 +83,7 @@ class IRCConnector(threading.Thread):
                     self.say(message, channel)
 
                 if lower == "$date":
-                    self.say("%s, the time is %s" %(username, datetime.now()), channel)
+                    self.say("%s: the time is %s" %(username, datetime.now()), channel)
 
                 if lower== "$kill":
                     self.s.send("QUIT :Bot quit\n")
@@ -103,17 +110,8 @@ def main():
     for irc in irc_connections:
         irc_thread = IRCConnector(irc['host'], irc['port'], irc['channels'])
         threads.append(irc_thread)
-        #irc_thread.daemon = True
         irc_thread.start()
 
-    while len(threads) > 0:
-    # Main thread must keep going to process signals
-        try:
-            threads = [t.join(1) for t in threads if t is not None and t.isAlive()]
-        except KeyboardInterrupt:
-            print "Ctrl-c received! Sending kill to threads..."
-            for t in threads:
-                t.kill_received = True
 
 if __name__ == "__main__":
     main()
