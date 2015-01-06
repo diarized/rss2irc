@@ -8,7 +8,6 @@ from datetime import datetime
 import threading
 import logging
 import Queue
-from pprint import pprint
 
 logging.basicConfig(
         level=logging.DEBUG,
@@ -16,8 +15,6 @@ logging.basicConfig(
 )
 
 DEBUG = True
-REFRESH_TIME = 30
-RECONNECT_TIME = REFRESH_TIME/2
 
 class IRCConnector(threading.Thread):
     def __init__ (self, host, port, channels):
@@ -54,11 +51,11 @@ class IRCConnector(threading.Thread):
 
     def connect(self):
         attempts = 3
-        self.s = socket.socket(socket.AF_INET, socket.SOCK_STREAM) #Define  IRC Socket
-
+        irc_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM) #Define  IRC Socket
+        remote_ip = socket.gethostbyname(self.host)
         while attempts:
             try:
-                self.s.connect((self.network,self.port)) #Connect to Server
+                irc_socket.connect((remote_ip,self.port)) #Connect to Server
             except socket.error:
                 # Try again
                 logging.warning("socket.error: cannot connect to IRC server.")
@@ -71,19 +68,11 @@ class IRCConnector(threading.Thread):
             error_msg = "socket.error: could not connect to IRC server for {0} secs"
             logging.error(error_msg.format(RECONNECT_TIME*attempts))
             sys.exit(1)
+        return irc_socket
 
     def run(self):
         logging.info("Thread of class IRCConnector started: '{0}'".format(self.name))
-        try:
-            self.s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-        except socket.error:
-            logging.error('Failed to create socket')
-            sys.exit()
-
-        remote_ip = socket.gethostbyname(self.host)
-        self.output(remote_ip)
-
-        self.s.connect((remote_ip, self.port))
+        self.s = self.connect()
         message1 = "NICK %s\r\n" %self.botname
         message2 = 'USER %s %s %s :%s\r\n' %(self.identity, self.hostname, self.host, self.realname)
         self.output(message1)
@@ -125,11 +114,11 @@ class IRCConnector(threading.Thread):
             if re.search("PRIVMSG", line):
                 details = line.split()
                 user = details[0].split("!")
-                username = user[0][1:]
+                username = user[0][1:].encode('utf-8')
                 channel = details[2]
                 messagelist = details[3:]
                 message = " ".join(messagelist)[1:]
-                lower = message.lower()
+                lower = message.lower().encode('utf-8')
                 logging.debug("Putting '{0}' into channel {1} queue".format(lower, channel))
                 try:
                     self.channel_queues[channel].put((username, lower))
@@ -152,7 +141,11 @@ class IRCChannel(threading.Thread):
 
     def say(self, message):
         logging.debug("Saying '{0}' on channel {1}".format(message, self.channel_name))
-        self.socket.send("PRIVMSG %s :%s\n" % (self.channel_name, message))
+        try:
+            self.socket.send("PRIVMSG %s :%s\n" % (self.channel_name, message))
+        except socket.error:
+            logging.error('Network socket unavailable. Exiting.')
+            self.queue = None
 
     def run(self):
         logging.debug("Thread of class IRCChannel started: '{0}'".format(self.name))
@@ -198,30 +191,4 @@ def put_in_queue(thread, recipient, message):
     thread.queue.put((recipient, message))
 
 
-def main():
-    threads = []
-    irc_connections = [{
-        "host": "irc.freenode.net",
-        "port": 6667,
-        "channels": ["#999net", "#999ned"]
-    },
-    ]
 
-    for irc in irc_connections:
-        irc_thread = IRCConnector(irc['host'], irc['port'], irc['channels'])
-        threads.append(irc_thread)
-        irc_thread.daemon = True
-        irc_thread.start()
-
-    time.sleep(6)
-    thr, botname = get_thread(threads, 'irc.freenode.net', '#999net')
-    for i in xrange(5):
-        put_in_queue(thr, botname, "{0} HAHA".format(i))
-        time.sleep(3)
-
-    logging.debug("All server threads started.")
-    [t.join() for t in threads]
-    
-
-if __name__ == "__main__":
-    main()
