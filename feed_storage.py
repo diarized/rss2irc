@@ -6,7 +6,7 @@ import time
 import feedparser
 import sys
 
-DEBUG = False
+DEBUG = True
 REFRESH_TIME = 300
 
 def store_link(db, entry):
@@ -31,66 +31,81 @@ def set_link_published(db, entry):
         db.commit()
     except (sql.OperationalError, sql.ProgrammingError), e:
         logging.error('Setting link as published failed: ' + title)
-        print e
+        logging.debug(e)
         return False
     else:
         return True
 
 
 def clear_table(conn):
-    logging.debug('DELETE FROM rss')
+    logging.debug('Clearing the database.')
     conn.execute("DELETE FROM rss;")
     conn.commit()
 
 
 class FeedStorage(threading.Thread):
-    def __init__(self):
-        ircc = {
-            "host": "irc.freenode.net",
-            "port": 6667,
-            "channels": ["#999net",]
-        }
-    
-        self.irc_thread = irc.IRCConnector(ircc['host'], ircc['port'], ircc['channels'])
+    def __init__(
+            self,
+            ircc={
+                'host': 'irc.freenode.net',
+                'port': 6667,
+                'channels': ['#999net',],
+            },
+            url='https://news.ycombinator.com/rss'
+        ):
+        self.url = url
+        self.conn = None
+        self.kill_received = threading.Event()
+        self.irc_thread = irc.IRCConnector(self, ircc['host'], ircc['port'], ircc['channels'])
         self.irc_thread.daemon = True
         self.irc_thread.start()
 
         time.sleep(5)
-        self.thr, self.botname = irc.get_thread([self.irc_thread], 'irc.freenode.net', '#999net')
+        self.thr, self.botname = irc.get_thread([self.irc_thread], ircc['host'], ircc['channels'][0])
 
         threading.Thread.__init__(self, name='FeedStorage')
 
+    def disconnect(self):
+        if self.conn:
+            self.conn.close()
+        self.irc_thread.kill_received.set()
+        self.kill_received.set()
+        sys.exit()
+
+    def store_and_publish(self, entry):
+        entry['link'] = entry['link'].encode('ascii', 'ignore')
+        entry['title'] = entry['title'].encode('ascii', 'ignore')
+        logging.debug('Parsing entry {0}'.format(entry['title']))
+        if store_link(self.conn, entry):
+            logging.debug('Link {0} stored'.format(entry['link']))
+            message = entry['title'].strip() + ' | ' + entry['link'].strip()
+            irc.put_in_queue(self.thr, self.botname, message)
+            set_link_published(self.conn, entry)
+            return True
+        else:
+            logging.error('Link not stored and not published: ' + entry['title'])
+        return False
+
     def run(self):
-        self.conn = sql.connect('hyrss')
+        if not self.conn:
+            self.conn = sql.connect('hyrss')
         if not self.conn:
             logging.error('Sqlite3 db file disappeared or locked.')
             sys.exit(1)
         logging.debug('conn is {0}'.format(self.conn))
-        while True:
+        while not self.kill_received.is_set():
             try:
                 if DEBUG: # DEBUG clears table in database
-                    logging.debug('Clearing the database.')
                     clear_table(self.conn)
                 logging.debug('Getting the feed')
-                feed = feedparser.parse('https://news.ycombinator.com/rss')
+                feed = feedparser.parse(self.url)
                 for entry in feed['entries']:
-                    entry['link'] = entry['link'].encode('ascii', 'ignore')
-                    entry['title'] = entry['title'].encode('ascii', 'ignore')
-                    logging.debug('Parsing entry {0}'.format(entry['title']))
-                    if store_link(self.conn, entry):
-                        logging.debug('Link {0} stored'.format(entry['link']))
-                        time.sleep(1)
-                        message = entry['title'].strip() + ' | ' + entry['link'].strip()
-                        irc.put_in_queue(self.thr, self.botname, message)
-                        set_link_published(self.conn, entry)
-                    else:
-                        logging.error('Link not stored and not published: ' + entry['title'])
+                    if self.store_and_publish(entry):
+                        time.sleep(1) # Do not abuse IRC
                 time.sleep(REFRESH_TIME)
             except Exception, e:
-                if self.conn:
-                    self.conn.close()
-                self.irc_thread.join()
-                print("Exception {0}. Exiting...".format(e))
-                sys.exit()
+                logging.error("Exception {0}. Exiting...".format(e))
+                self.disconnect()
+
 
 

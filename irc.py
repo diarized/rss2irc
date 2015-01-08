@@ -17,7 +17,8 @@ logging.basicConfig(
 DEBUG = True
 
 class IRCConnector(threading.Thread):
-    def __init__ (self, host, port, channels):
+    def __init__ (self, parent, host, port, channels):
+        self.parent = parent
         self.host = host
         self.port = port
         self.channels = channels
@@ -35,6 +36,8 @@ class IRCConnector(threading.Thread):
 
     def disconnect(self):
         self.s.close()
+        self.parent.kill_received.set()
+        self.kill_received.set()
         sys.exit()
 
     def receive(self):
@@ -42,7 +45,6 @@ class IRCConnector(threading.Thread):
                 line = self.s.recv(500)
             except socket.error:
                 logging.error("Disconnected")
-                [t.join() for t in threading.enumerate()]
                 self.disconnect()
             if line:
                 return line
