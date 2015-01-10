@@ -9,12 +9,16 @@ import threading
 import logging
 import Queue
 
+
+DEBUG = True
+RECONNECT_TIME=5
+
+
 logging.basicConfig(
         level=logging.DEBUG,
         format='[%(asctime)s %(levelname)s] (%(threadName)-10s) %(message)s',
 )
 
-DEBUG = True
 
 class IRCConnector(threading.Thread):
     def __init__ (self, parent, host, port, channels):
@@ -31,14 +35,17 @@ class IRCConnector(threading.Thread):
         self.kill_received = threading.Event()
         threading.Thread.__init__(self, name=host)
 
+
     def output(self, message):
         logging.info("Server: %s\nMessage:%s\n" % (self.host, message))
+
 
     def disconnect(self):
         self.s.close()
         self.parent.kill_received.set()
         self.kill_received.set()
         sys.exit()
+
 
     def receive(self):
             try:
@@ -149,6 +156,12 @@ class IRCChannel(threading.Thread):
             logging.error('Network socket unavailable. Exiting.')
             self.queue = None
 
+    def disconnect(self):
+        self.socket.send("QUIT :Bot quit\n")
+        self.irc_conn.disconnect()
+        self.kill_received.set()
+        sys.exit()
+
     def run(self):
         logging.debug("Thread of class IRCChannel started: '{0}'".format(self.name))
         while not self.kill_received.is_set():
@@ -161,13 +174,9 @@ class IRCChannel(threading.Thread):
             elif lower == "$date":
                 self.say("{0}: the time is {1}".format(username, datetime.now()))
             elif lower== "$kill":
-                self.socket.send("QUIT :Bot quit\n")
-                [t.kill_received.set() for t in threading.enumerate()]
-                self.irc_conn.disconnect()
-                sys.exit()
+                self.disconnect()
             else:
                 self.say(lower)
-
             self.queue.task_done()
 
 

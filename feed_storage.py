@@ -7,16 +7,16 @@ import feedparser
 import sys
 
 DEBUG = True
-REFRESH_TIME = 300
+REFRESH_TIME = 30
 
 def store_link(db, entry):
     logging.debug('Storing link ' + entry['title'])
     try:
-        db.execute("INSERT INTO rss VALUES('%s', '%s', '%s');" % (entry['title'], entry['link'], 0))
+        db.execute("INSERT INTO rss VALUES (?, ?, ?)", (entry['title'], entry['link'], 0))
         db.commit()
     except (sql.OperationalError, sql.ProgrammingError, sql.IntegrityError), e:
+        logging.error(e)
         logging.error('Storing link failed: ' + entry['title'])
-        print e
         return False
     else:
         return True
@@ -27,7 +27,7 @@ def set_link_published(db, entry):
     link  = entry['link']
     logging.debug(u'Link on IRC, setting it as published in database. ({0})'.format(title))
     try:
-        db.execute("UPDATE rss SET published = '%s';" % 1)
+        db.execute("UPDATE rss SET published = 1")
         db.commit()
     except (sql.OperationalError, sql.ProgrammingError), e:
         logging.error('Setting link as published failed: ' + title)
@@ -86,17 +86,22 @@ class FeedStorage(threading.Thread):
             logging.error('Link not stored and not published: ' + entry['title'])
         return False
 
-    def run(self):
+
+    def connect(self):
         if not self.conn:
             self.conn = sql.connect('hyrss')
         if not self.conn:
             logging.error('Sqlite3 db file disappeared or locked.')
             sys.exit(1)
-        logging.debug('conn is {0}'.format(self.conn))
+        logging.debug('Connection to database established.')
+        if DEBUG: # DEBUG clears table in database
+            clear_table(self.conn)
+
+
+    def run(self):
+        self.connect()
         while not self.kill_received.is_set():
             try:
-                if DEBUG: # DEBUG clears table in database
-                    clear_table(self.conn)
                 logging.debug('Getting the feed')
                 feed = feedparser.parse(self.url)
                 for entry in feed['entries']:
@@ -106,6 +111,4 @@ class FeedStorage(threading.Thread):
             except Exception, e:
                 logging.error("Exception {0}. Exiting...".format(e))
                 self.disconnect()
-
-
 
