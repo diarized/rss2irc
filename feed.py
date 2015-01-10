@@ -1,6 +1,7 @@
 import irc
-#import storage
+import storage
 import threading
+import Queue
 import logging
 import time
 import feedparser
@@ -24,11 +25,12 @@ class Feeder(threading.Thread):
         self.urls = urls
         self.conn = None
         self.kill_received = threading.Event()
+        self.queue = Queue.Queue()
         self.irc_thread = irc.IRCConnector(self, ircc['host'], ircc['port'], ircc['channels'])
         self.irc_thread.daemon = True
         self.irc_thread.start()
 
-        self.store = storage.Storage(host)
+        self.store = storage.Storage(ircc['host'])
 
         time.sleep(5)
         self.thr, self.botname = irc.get_thread([self.irc_thread], ircc['host'], ircc['channels'][0])
@@ -37,8 +39,9 @@ class Feeder(threading.Thread):
 
 
     def disconnect(self):
-        storage.disconnect()
+        logging.debug("feed.disconnect(): my thread name is '{0}'".format(self.name))
         self.irc_thread.kill_received.set()
+        self.store.kill_received.set()
         self.kill_received.set()
         sys.exit()
 
@@ -46,33 +49,29 @@ class Feeder(threading.Thread):
     def store_and_publish(self, feed_name, entry):
         entry['link'] = entry['link'].encode('ascii', 'ignore')
         entry['title'] = entry['title'].encode('ascii', 'ignore')
-        logging.debug('Parsing entry {0}'.format(entry['title']))
-        if self.store.store_link(feed_name, entry):
-            logging.debug('Link {0} stored'.format(entry['link']))
-            message = entry['title'].strip() + ' | ' + entry['link'].strip()
-            irc.put_in_queue(self.thr, self.botname, message)
-            storage.set_link_published(feed_name, entry)
-            return True
-        else:
-            logging.error('Link not stored and not published: ' + entry['title'])
-        return False
+        self.store.queue.put((self, feed_name, entry))
+        logging.debug('Link {0} stored'.format(entry['link']))
 
 
-    def publish_feed(feed_name, url):
+    def publish_feed(self, feed_name, url):
         logging.debug('Getting the feed {0} from {1}'.format(feed_name, url))
         feed = feedparser.parse(url)
         for entry in feed['entries']:
-            if self.store.store_and_publish(feed_name, entry):
-                time.sleep(1) # Do not abuse IRC
+            self.store_and_publish(feed_name, entry)
         time.sleep(REFRESH_TIME)
 
 
     def run(self):
-        self.connect()
         while not self.kill_received.is_set():
             try:
                 for feed_name, url in self.urls:
                     self.publish_feed(feed_name, url)
+                    result, feed_name, entry = self.queue.get()
+                    if result:
+                        message = entry['title'].strip() + ' | ' + entry['link'].strip()
+                        irc.put_in_queue(self.thr, self.botname, message)
+                        self.store.set_link_published(feed_name, entry)
+                        time.sleep(1)
             except Exception, e:
                 logging.error("Exception {0}. Exiting...".format(e))
                 self.disconnect()

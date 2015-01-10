@@ -42,6 +42,7 @@ class IRCConnector(threading.Thread):
 
 
     def disconnect(self):
+        logging.debug("irc.disconnect(): my thread name is '{0}'".format(self.name))
         self.s.close()
         self.parent.kill_received.set()
         self.kill_received.set()
@@ -60,6 +61,7 @@ class IRCConnector(threading.Thread):
 
 
     def connect(self):
+        logging.debug("irc.connect(): my thread name is '{0}'".format(self.name))
         attempts = 3
         irc_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM) #Define  IRC Socket
         remote_ip = socket.gethostbyname(self.host)

@@ -1,9 +1,9 @@
 #!/usr/bin/env python
 
-import feed_storage
+import feed
 
 def main():
-    storage = feed_storage.Feeder()
+    storage = feed.Feeder()
     storage.daemon = True
     storage.start()
     storage.join()
