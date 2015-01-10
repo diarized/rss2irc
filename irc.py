@@ -8,6 +8,7 @@ from datetime import datetime
 import threading
 import logging
 import Queue
+import storage
 
 
 DEBUG = True
@@ -200,6 +201,5 @@ def get_thread(threads, server, channel):
 def put_in_queue(thread, recipient, message):
     logging.debug('Putting values ({0}, {1}) in queue of thread {2}'.format(recipient, message, thread.queue))
     thread.queue.put((recipient, message))
-
 
 

@@ -3,7 +3,7 @@
 import feed_storage
 
 def main():
-    storage = feed_storage.FeedStorage()
+    storage = feed_storage.Feeder()
     storage.daemon = True
     storage.start()
     storage.join()
