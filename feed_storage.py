@@ -6,8 +6,8 @@ import time
 import feedparser
 import sys
 
-DEBUG = True
-REFRESH_TIME = 30
+DEBUG = False
+REFRESH_TIME = 300
 
 def store_link(db, entry):
     logging.debug('Storing link ' + entry['title'])
