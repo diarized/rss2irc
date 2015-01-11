@@ -70,7 +70,7 @@ class Feeder(threading.Thread):
             try:
                 for feed_name, url in self.urls:
                     if DEBUG:
-                        self.store.queue.put(self, 'clear_table', feed_name, None)
+                        self.store.queue.put((self, 'clear_table', feed_name, None))
                     self.publish_feed(feed_name, url)
                     result, feed_name, entry = self.queue.get()
                     if result:
