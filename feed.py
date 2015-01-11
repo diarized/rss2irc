@@ -7,7 +7,8 @@ import time
 import feedparser
 import sys
 
-REFRESH_TIME = 300
+DEBUG = True
+REFRESH_TIME = 30
 
 class Feeder(threading.Thread):
     def __init__(
@@ -31,6 +32,8 @@ class Feeder(threading.Thread):
         self.irc_thread.start()
 
         self.store = storage.Storage(ircc['host'])
+        self.store.daemon = True
+        self.store.start()
 
         time.sleep(5)
         self.thr, self.botname = irc.get_thread([self.irc_thread], ircc['host'], ircc['channels'][0])
@@ -49,7 +52,8 @@ class Feeder(threading.Thread):
     def store_and_publish(self, feed_name, entry):
         entry['link'] = entry['link'].encode('ascii', 'ignore')
         entry['title'] = entry['title'].encode('ascii', 'ignore')
-        self.store.queue.put((self, feed_name, entry))
+        action = 'publish'
+        self.store.queue.put((self, action, feed_name, entry))
         logging.debug('Link {0} stored'.format(entry['link']))
 
 
@@ -65,6 +69,8 @@ class Feeder(threading.Thread):
         while not self.kill_received.is_set():
             try:
                 for feed_name, url in self.urls:
+                    if DEBUG:
+                        self.store.queue.put(self, 'clear_table', feed_name, None)
                     self.publish_feed(feed_name, url)
                     result, feed_name, entry = self.queue.get()
                     if result:
