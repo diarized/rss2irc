@@ -200,8 +200,8 @@ def get_thread(threads, server, channel):
     return None
 
 
-def put_in_queue(thread, recipient, message):
-    logging.debug('Putting values ({0}, {1}) in queue of thread {2}'.format(recipient, message, thread.queue))
-    thread.queue.put((recipient, message))
+def put_in_queue(producer_thread, consumer_thread, recipient, message):
+    logging.debug("Putting values ({0}, {1}) from thread '{2}' in queue of thread '{3}'".format(recipient, message, producer_thread.name, consumer_thread.name))
+    consumer_thread.queue.put((recipient, message))
 
 

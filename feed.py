@@ -37,6 +37,9 @@ class Feeder(threading.Thread):
 
         time.sleep(5)
         self.thr, self.botname = irc.get_thread([self.irc_thread], ircc['host'], ircc['channels'][0])
+        if DEBUG:
+            for feed_name, url in self.urls:
+              self.store.queue.put((self, 'clear_table', feed_name, None))
 
         threading.Thread.__init__(self, name='Feeder')
 
@@ -53,8 +56,14 @@ class Feeder(threading.Thread):
         entry['link'] = entry['link'].encode('ascii', 'ignore')
         entry['title'] = entry['title'].encode('ascii', 'ignore')
         action = 'publish'
+        logging.debug(
+            "Putting 'publish' request from '{local_thread_name}' to storage thread '{storage_thread_name}' for link '{link}'".format(
+                local_thread_name   = self.name,
+                storage_thread_name = self.store.name,
+                link                = entry['title']
+            )
+        )
         self.store.queue.put((self, action, feed_name, entry))
-        logging.debug('Link {0} stored'.format(entry['link']))
 
 
     def publish_feed(self, feed_name, url):
@@ -62,23 +71,23 @@ class Feeder(threading.Thread):
         feed = feedparser.parse(url)
         for entry in feed['entries']:
             self.store_and_publish(feed_name, entry)
-        time.sleep(REFRESH_TIME)
 
 
     def run(self):
         while not self.kill_received.is_set():
             try:
                 for feed_name, url in self.urls:
-                    if DEBUG:
-                        self.store.queue.put((self, 'clear_table', feed_name, None))
-                    self.publish_feed(feed_name, url)
+                    logging.debug("Processing feed '{0}' in thread '{1}'.".format(feed_name, self.name))
+                    self.publish_feed(feed_name, url))
                     result, feed_name, entry = self.queue.get()
                     if result:
                         message = entry['title'].strip() + ' | ' + entry['link'].strip()
-                        irc.put_in_queue(self.thr, self.botname, message)
+                        irc.put_in_queue(self, self.thr, self.botname, message)
                         self.store.set_link_published(feed_name, entry)
                         time.sleep(1)
             except Exception, e:
                 logging.error("Exception {0}. Exiting...".format(e))
                 self.disconnect()
+                raise
+            time.sleep(REFRESH_TIME)
 
