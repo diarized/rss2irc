@@ -32,6 +32,7 @@ class Storage(threading.Thread):
         if not self.conn:
             logging.error('Sqlite3 db file disappeared or locked.')
             sys.exit(1)
+        self.conn.text_factory = str
         logging.debug('Connection to database established.')
     
 
