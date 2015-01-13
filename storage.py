@@ -65,11 +65,13 @@ class Storage(threading.Thread):
         try:
             self.insert(table_name, entry)
         except (sql.OperationalError, sql.ProgrammingError, sql.IntegrityError), e:
+            logging.error(str(e))
             if re.search('no such table', str(e)):
                 self.create_table(table_name)
                 self.insert(table_name, entry)
-            logging.error(e)
-            logging.error('Storing link failed: ' + entry['title'])
+                return True
+            else:
+                logging.error('Storing link failed: ' + entry['title'])
             return False
         except AttributeError:
             self.connect()

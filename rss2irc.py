@@ -101,12 +101,15 @@ def main():
     irc_thread.start()
 
     irc_queue = None
-    while True:
+    attempts = 3
+    reconnect_time = 5
+    while attempts:
         try:
             irc_queue = irc_thread.channel_queues[channel]
         except KeyError:
             logging.warning("No channel_queues['{0}'] instantiated. Get some sleep.".format(channel))
-            time.sleep(5)
+            attempts -= 1
+            time.sleep(reconnect_time)
         else:
             logging.info("channel_queues['{0}'] instantiated. Go ahead.".format(channel))
             break
