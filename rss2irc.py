@@ -37,7 +37,7 @@ def grabber(feeds, feed_queue):
         time.sleep(REFRESH_TIME)
 
 
-def publisher(feed_queue, store, irc_queue):
+def publisher(feed_queue, store_queue, irc_queue):
     logging.debug('Entering into publisher()')
     feedback_queue = Queue.Queue()
     while True:
@@ -50,7 +50,7 @@ def publisher(feed_queue, store, irc_queue):
             logging.debug("New item in feed_queue.")
             feed_queue.task_done()
 
-        store.queue.put((feedback_queue, 'publish', feed_name, entry))
+        store_queue.put((feedback_queue, 'publish', feed_name, entry))
         result, feed_name, entry = feedback_queue.get()
         if not feed_name:
             logging.debug("No items in feedback_queue (nothing stored).")
@@ -112,7 +112,7 @@ def main():
             break
 
     store = storage.Storage()
-    publisher_thread = threading.Thread(target=publisher, args=(feed_queue, store, irc_queue), name='Publisher')
+    publisher_thread = threading.Thread(target=publisher, args=(feed_queue, store_queue, irc_queue), name='Publisher')
     publisher_thread.start()
 
     threads = []
@@ -122,7 +122,7 @@ def main():
     threads.append(publisher_thread)
     while not main_thread.kill_received.is_set():
         logging.info("main_thread.kill_received IS NOT SET.")
-        time.sleep(1)
+        time.sleep(3)
     logging.info("main_thread.kill_received IS SET. Killing Storage and exiting.")
     store.kill_received.set()
     feed_queue = None # Exit condition for Grabber
