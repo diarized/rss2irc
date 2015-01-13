@@ -113,9 +113,12 @@ class Storage(threading.Thread):
             feeder_queue, action, feed_name, entry = self.queue.get()
             logging.debug("The Storage received action '{0}'".format(action))
             if action == 'publish':
-                if self.store_link(feed_name, entry) and feeder:
+                stored = self.store_link(feed_name, entry)
+                if stored and feeder_queue:
                     logging.debug("Putting in feeder '{0}' queue an info about the success of storing link >>>{1}<<<.".format(feeder.name, entry['title']))
                     feeder_queue.put((True, feed_name, entry))
+                else:
+                    logging.warning("store_link result = {0}, feeder_queue = {1}".format(stored, feeder_queue))
             elif action == 'clear_table':
                 table_name = feed_name
                 self.clear_table(table_name)

@@ -40,6 +40,8 @@ def grabber(feeds, feed_queue):
 def publisher(feed_queue, store_queue, irc_queue):
     logging.debug('Entering into publisher()')
     feedback_queue = Queue.Queue()
+    if DEBUG:
+        store_queue.put((feedback_queue, 'clear_table', feed_name, None))
     while True:
         feed_name, entry = feed_queue.get()
         if not feed_name:
