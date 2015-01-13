@@ -94,7 +94,7 @@ class IRCConnector(threading.Thread):
 
         for chan in self.channels:
             logging.debug("Building thread for channel {0}".format(chan))
-            q = Queue.Queue(10)
+            q = Queue.Queue()
             self.channel_queues[chan] = q
             channel_thread = IRCChannel(self, self.s, chan, q)
             self.channel_threads[chan] = channel_thread

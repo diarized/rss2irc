@@ -52,32 +52,31 @@ class Storage(threading.Thread):
         self.conn.commit()
 
 
+    def insert(table_name, entry):
+        self.conn.execute("INSERT INTO {0} VALUES (?, ?, ?)".format(table_name),
+                (
+                    entry['title'],
+                    entry['link'],
+                    0
+                )
+        )
+        self.conn.commit()
+
+
     def store_link(self, table_name, entry):
         logging.debug("Storing in table '{0}' link >>>{1}<<<".format(table_name, entry['title']))
         try:
-            self.conn.execute("INSERT INTO {0} VALUES (?, ?, ?)".format(table_name),
-                    (
-                        entry['title'],
-                        entry['link'],
-                        0
-                    )
-            )
-            self.conn.commit()
+            self.insert(table_name, entry)
         except (sql.OperationalError, sql.ProgrammingError, sql.IntegrityError), e:
             if re.search('no such table', str(e)):
                 self.create_table(table_name)
-                self.conn.execute("INSERT INTO ? VALUES (?, ?, ?)",
-                        (
-                            table_name,
-                            entry['title'],
-                            entry['link'],
-                            0
-                        )
-                )
-            self.conn.commit()
+                self.insert(table_name, entry)
             logging.error(e)
             logging.error('Storing link failed: ' + entry['title'])
             return False
+        except AttributeError:
+            self.connect()
+            self.insert(table_name, entry)
         else:
             logging.error('Storing link succeeded: ' + entry['title'])
             return True
@@ -111,12 +110,12 @@ class Storage(threading.Thread):
     def run(self):
         self.connect()
         while not self.kill_received.is_set():
-            feeder, action, feed_name, entry = self.queue.get()
+            feeder_queue, action, feed_name, entry = self.queue.get()
             logging.debug("Storage received action '{0}'".format(action))
             if action == 'publish':
-                if self.store_link(feed_name, entry):
+                if self.store_link(feed_name, entry) and feeder:
                     logging.debug("Putting in feeder '{0}' queue an info about the success of storing link >>>{1}<<<.".format(feeder.name, entry['title']))
-                    feeder.queue.put((True, feed_name, entry))
+                    feeder_queue.put((True, feed_name, entry))
             elif action == 'clear_table':
                 table_name = feed_name
                 self.clear_table(table_name)
