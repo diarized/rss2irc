@@ -49,7 +49,7 @@ class Storage(threading.Thread):
         self.conn.commit()
 
 
-    def insert(table_name, entry):
+    def insert(self, table_name, entry):
         self.conn.execute("INSERT INTO {0} VALUES (?, ?, ?)".format(table_name),
                 (
                     entry['title'],
