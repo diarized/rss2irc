@@ -20,8 +20,10 @@ def grabber(feeds, feed_queue):
     logging.debug('Entering into grabber()')
     while True:
         for feed_name, feed_url in feeds:
+            logging.debug('Reading feed {0}'.format(feed_name))
             raw_feed = feedparser.parse(feed_url)
             for entry in raw_feed['entries']:
+                logging.debug("Putting entry '{'title'}' into feed queue".format(entry))
                 feed_queue.put((feed_name, entry))
         time.sleep(30)
 
@@ -40,6 +42,7 @@ def publisher(feed_queue, store, irc_queue):
                         ])
                     )
             )
+            time.sleep(1)
 
 
 def main():
@@ -73,7 +76,7 @@ def main():
     publisher_thread = threading.Thread(target=publisher, args=(feed_queue, store, irc_queue))
     publisher_thread.start()
     threads.append(publisher_thread)
-    #[t.join() for t in threads]
+    [t.join() for t in threads]
 
 
 if __name__ == '__main__':
