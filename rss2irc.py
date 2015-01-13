@@ -112,6 +112,8 @@ def main():
             break
 
     store = storage.Storage()
+    store.daemon = True
+    store.start()
     publisher_thread = threading.Thread(target=publisher, args=(feed_queue, store.queue, irc_queue), name='Publisher')
     publisher_thread.start()
 
@@ -122,6 +124,7 @@ def main():
     threads.append(publisher_thread)
     while not main_thread.kill_received.is_set():
         logging.info("main_thread.kill_received IS NOT SET.")
+        logging.debug(str([t.name for t in threading.enumerate()]))
         time.sleep(3)
     logging.info("main_thread.kill_received IS SET. Killing Storage and exiting.")
     store.kill_received.set()

@@ -33,9 +33,6 @@ class Storage(threading.Thread):
             logging.error('Sqlite3 db file disappeared or locked.')
             sys.exit(1)
         logging.debug('Connection to database established.')
-        # I do not know which table to truncate :-(
-        #if DEBUG: # DEBUG clears table in database
-        #    self.clear_table()
     
 
     def disconnect(self):
@@ -108,6 +105,7 @@ class Storage(threading.Thread):
     
 
     def run(self):
+        logging.debug("I am into 'storage.Storage.run()")
         self.connect()
         while not self.kill_received.is_set():
             feeder_queue, action, feed_name, entry = self.queue.get()
