@@ -131,6 +131,7 @@ class IRCConnector(threading.Thread):
                 messagelist = details[3:]
                 message = " ".join(messagelist)[1:]
                 lower = message.lower().encode('utf-8')
+                logging.debug("Received a message on IRC: '{0}'".format(lower)
                 logging.debug("Putting '{0}' into channel {1} queue".format(lower, channel))
                 try:
                     self.channel_queues[channel].put((username, lower))
@@ -181,6 +182,7 @@ class IRCChannel(threading.Thread):
             else:
                 self.say(lower)
             self.queue.task_done()
+            time.sleep(1)
 
 
 def get_thread(threads, server, channel):
