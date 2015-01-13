@@ -111,7 +111,7 @@ class Storage(threading.Thread):
         self.connect()
         while not self.kill_received.is_set():
             feeder_queue, action, feed_name, entry = self.queue.get()
-            logging.debug("Storage received action '{0}'".format(action))
+            logging.debug("The Storage received action '{0}'".format(action))
             if action == 'publish':
                 if self.store_link(feed_name, entry) and feeder:
                     logging.debug("Putting in feeder '{0}' queue an info about the success of storing link >>>{1}<<<.".format(feeder.name, entry['title']))

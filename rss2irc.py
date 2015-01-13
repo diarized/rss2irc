@@ -37,8 +37,22 @@ def publisher(feed_queue, store, irc_queue):
     feedback_queue = Queue.Queue()
     while True:
         feed_name, entry = feed_queue.get()
+        if not feed_name:
+            logging.debug("No items in feed_queue.")
+            time.sleep(1)
+            continue
+        else:
+            feed_queue.task_done()
+
         store.queue.put((feedback_queue, 'publish', feed_name, entry))
         result, feed_name, entry = feedback_queue.get()
+        if not feed_name:
+            logging.debug("No items in feedback_queue (nothing stored).")
+            time.sleep(1)
+            continue
+        else:
+            feedback_queue.task_done()
+
         if result:
             logging.debug("Entry '{0}' is new, saving.".format(entry['title']))
             irc_queue.put(
@@ -54,8 +68,6 @@ def publisher(feed_queue, store, irc_queue):
             time.sleep(1)
         else:
             logging.debug("Entry '{0}' already saved.".format(entry['title']))
-        feed_queue.task_done()
-        feedback_queue.task_done()
 
 
 def main():
