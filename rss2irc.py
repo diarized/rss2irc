@@ -11,6 +11,7 @@ import logging
 from pprint import pprint
 
 
+DEBUG = True
 REFRESH_TIME = 120
 
 
@@ -40,10 +41,12 @@ def grabber(feeds, feed_queue):
 def publisher(feed_queue, store_queue, irc_queue):
     logging.debug('Entering into publisher()')
     feedback_queue = Queue.Queue()
-    if DEBUG:
-        store_queue.put((feedback_queue, 'clear_table', feed_name, None))
+    cleared_tables = {}
     while True:
         feed_name, entry = feed_queue.get()
+        if DEBUG and feed_name not in cleared_tables.keys():
+            store_queue.put((feedback_queue, 'clear_table', feed_name, None))
+            cleared_tables[feed_name] = True
         if not feed_name:
             logging.debug("No items in feed_queue.")
             time.sleep(1)
