@@ -112,7 +112,7 @@ def main():
             break
 
     store = storage.Storage()
-    publisher_thread = threading.Thread(target=publisher, args=(feed_queue, store_queue, irc_queue), name='Publisher')
+    publisher_thread = threading.Thread(target=publisher, args=(feed_queue, store.queue, irc_queue), name='Publisher')
     publisher_thread.start()
 
     threads = []
