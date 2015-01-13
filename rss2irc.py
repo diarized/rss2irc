@@ -37,7 +37,7 @@ def publisher(feed_queue, store, irc_queue):
     feedback_queue = Queue.Queue()
     while True:
         feed_name, entry = feed_queue.get()
-        store.queue.put(feedback_queue, 'publish', feed_name, entry)
+        store.queue.put((feedback_queue, 'publish', feed_name, entry))
         result, feed_name, entry = feedback_queue.get()
         if result:
             logging.debug("Entry '{0}' is new, saving.".format(entry['title']))
