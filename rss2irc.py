@@ -38,7 +38,7 @@ def grabber(feeds, feed_queue):
         time.sleep(REFRESH_TIME)
 
 
-def publisher(feed_queue, store_queue, irc_queue):
+def publisher(feed_queue, store_queue, irc_queue, botname):
     logging.debug('Entering into publisher()')
     feedback_queue = Queue.Queue()
     cleared_tables = {}
@@ -69,7 +69,7 @@ def publisher(feed_queue, store_queue, irc_queue):
             logging.debug("Entry '{0}' is new, saving.".format(entry['title']))
             irc_queue.put(
                     (
-                        irc_thread.botname,
+                        botname,
                         ' | '.join([
                                     feed_name,
                                     entry['title'],
@@ -122,7 +122,7 @@ def main():
     store = storage.Storage()
     store.daemon = True
     store.start()
-    publisher_thread = threading.Thread(target=publisher, args=(feed_queue, store.queue, irc_queue), name='Publisher')
+    publisher_thread = threading.Thread(target=publisher, args=(feed_queue, store.queue, irc_queue, irc_thread.botname), name='Publisher')
     publisher_thread.start()
 
     threads = []

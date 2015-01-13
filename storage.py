@@ -115,7 +115,7 @@ class Storage(threading.Thread):
             if action == 'publish':
                 stored = self.store_link(feed_name, entry)
                 if stored and feeder_queue:
-                    logging.debug("Putting in feeder '{0}' queue an info about the success of storing link >>>{1}<<<.".format(feeder.name, entry['title']))
+                    logging.debug("Putting in feeder queue an info about the success of storing link >>>{0}<<<.".format(entry['title']))
                     feeder_queue.put((True, feed_name, entry))
                 else:
                     logging.warning("store_link result = {0}, feeder_queue = {1}".format(stored, feeder_queue))
