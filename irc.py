@@ -104,8 +104,8 @@ class IRCConnector(threading.Thread):
         while not self.kill_received.is_set():
             line = self.receive()
             if line:
-                self.output(line)
-                logging.debug("Number of threads alive: {0}".format(threading.active_count()))
+                #self.output(line)
+                logging.debug("Something received from IRC. Number of threads alive: {0}".format(threading.active_count()))
                 logging.debug(str([t.name for t in threading.enumerate()]))
             else:
                 continue

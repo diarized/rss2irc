@@ -10,7 +10,9 @@ import Queue
 import logging
 from pprint import pprint
 
+
 REFRESH_TIME = 120
+
 
 logging.basicConfig(
         level=logging.DEBUG,
@@ -27,8 +29,11 @@ def grabber(feeds, feed_queue):
             for entry in raw_feed['entries']:
                 entry['title'] = entry['title'].encode('utf-8', 'ignore')
                 entry['link'] = entry['link'].encode('utf-8')
-                logging.debug("Putting entry '{0}' into feed queue".format(entry['title']))
-                feed_queue.put((feed_name, entry))
+                if feed_queue:
+                    logging.debug("Putting entry '{0}' into feed queue".format(entry['title']))
+                    feed_queue.put((feed_name, entry))
+                else:
+                    sys.exit()
         time.sleep(REFRESH_TIME)
 
 
@@ -42,6 +47,7 @@ def publisher(feed_queue, store, irc_queue):
             time.sleep(1)
             continue
         else:
+            logging.debug("New item in feed_queue.")
             feed_queue.task_done()
 
         store.queue.put((feedback_queue, 'publish', feed_name, entry))
@@ -51,6 +57,7 @@ def publisher(feed_queue, store, irc_queue):
             time.sleep(1)
             continue
         else:
+            logging.debug("New item in feedback_queue (xsomething stored).")
             feedback_queue.task_done()
 
         if result:
@@ -114,8 +121,11 @@ def main():
     threads.append(store)
     threads.append(publisher_thread)
     while not main_thread.kill_received.is_set():
-        continue
+        logging.info("main_thread.kill_received IS NOT SET.")
+        time.sleep(1)
+    logging.info("main_thread.kill_received IS SET. Killing Storage and exiting.")
     store.kill_received.set()
+    feed_queue = None # Exit condition for Grabber
 
 
 if __name__ == '__main__':
