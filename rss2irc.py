@@ -11,12 +11,12 @@ import logging
 from pprint import pprint
 
 
-DEBUG = True
-REFRESH_TIME = 100
+DEBUG = False
+REFRESH_TIME = 300
 
 
 logging.basicConfig(
-        level=logging.DEBUG,
+        level=logging.INFO,
         format='[%(asctime)s %(levelname)s] (%(threadName)-10s) %(message)s',
 )
 

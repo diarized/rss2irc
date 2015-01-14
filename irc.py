@@ -11,12 +11,12 @@ import Queue
 import storage
 
 
-DEBUG = True
+DEBUG = False
 RECONNECT_TIME=5
 
 
 logging.basicConfig(
-        level=logging.DEBUG,
+        level=logging.INFO,
         format='[%(asctime)s %(levelname)s] (%(threadName)-10s) %(message)s',
 )
 

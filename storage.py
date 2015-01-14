@@ -6,11 +6,11 @@ import sys
 import re
 
 
-DEBUG = True
+DEBUG = False
 
 
 logging.basicConfig(
-        level=logging.DEBUG,
+        level=logging.INFO,
         format='[%(asctime)s %(levelname)s] (%(threadName)-10s) %(message)s',
 )
 
@@ -66,19 +66,19 @@ class Storage(threading.Thread):
         try:
             self.insert(table_name, entry)
         except (sql.OperationalError, sql.ProgrammingError, sql.IntegrityError), e:
-            logging.error(str(e))
+            logging.debug(str(e))
             if re.search('no such table', str(e)):
                 self.create_table(table_name)
                 self.insert(table_name, entry)
                 return True
             else:
-                logging.error('Storing link failed: ' + entry['title'])
+                logging.debug('Storing link failed: ' + entry['title'])
             return False
         except AttributeError:
             self.connect()
             self.insert(table_name, entry)
         else:
-            logging.error('Storing link succeeded: ' + entry['title'])
+            logging.info('Storing link succeeded: ' + entry['title'])
             return True
     
     
@@ -91,7 +91,7 @@ class Storage(threading.Thread):
             self.conn.commit()
         except (sql.OperationalError, sql.ProgrammingError), e:
             logging.error('Setting link as published failed: ' + title)
-            logging.debug(e)
+            logging.error(e)
             return False
         else:
             return True
