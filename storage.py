@@ -111,15 +111,18 @@ class Storage(threading.Thread):
         logging.debug("I am into 'storage.Storage.run()")
         self.connect()
         while not self.kill_received.is_set():
-            feeder_queue, action, feed_name, entry = self.queue.get()
+            feedback_queue, action, feed_name, entry = self.queue.get()
             logging.debug("The Storage received action '{0}'".format(action))
             if action == 'publish':
-                stored = self.store_link(feed_name, entry)
-                if stored and feeder_queue:
-                    logging.debug("Putting in feeder queue an info about the success of storing link >>>{0}<<<.".format(entry['title']))
-                    feeder_queue.put((True, feed_name, entry))
+                is_stored = self.store_link(feed_name, entry)
+                if is_stored and feedback_queue:
+                    logging.debug("Putting in feedback queue an info about the success of storing link >>>{0}<<<.".format(entry['title']))
+                    feedback_queue.put((True, feed_name, entry))
+                elif feedback_queue:
+                    logging.debug("Putting in feedback queue an info about the FAIL of storing link >>>{0}<<<.".format(entry['title']))
+                    feedback_queue.put((False, feed_name, entry))
                 else:
-                    logging.warning("store_link result = {0}, feeder_queue = {1}".format(stored, feeder_queue))
+                    logging.warning("store_link result = {0}, feedback_queue = {1}".format(is_stored, feedback_queue))
             elif action == 'clear_table':
                 table_name = feed_name
                 self.clear_table(table_name)

@@ -12,7 +12,7 @@ from pprint import pprint
 
 
 DEBUG = True
-REFRESH_TIME = 120
+REFRESH_TIME = 100
 
 
 logging.basicConfig(
@@ -22,8 +22,11 @@ logging.basicConfig(
 
 
 def grabber(feeds, feed_queue):
-    logging.debug('Entering into grabber()')
+    logging.info('Entering into grabber()')
     while True:
+        if DEBUG:
+            feed_queue.put(('clear_table', None))
+
         for feed_name, feed_url in feeds:
             logging.debug('Reading feed {0}'.format(feed_name))
             raw_feed = feedparser.parse(feed_url)
@@ -39,31 +42,33 @@ def grabber(feeds, feed_queue):
 
 
 def publisher(feed_queue, store_queue, irc_queue, botname):
-    logging.debug('Entering into publisher()')
+    logging.info('Entering into publisher()')
     feedback_queue = Queue.Queue()
     cleared_tables = {}
     while True:
+        time.sleep(1)
         feed_name, entry = feed_queue.get()
-        if DEBUG and feed_name not in cleared_tables.keys():
+
+        if DEBUG and feed_name == 'clear_table': # and feed_name not in cleared_tables.keys(): # uncomment to clear once
             store_queue.put((feedback_queue, 'clear_table', feed_name, None))
             cleared_tables[feed_name] = True
+            feed_queue.task_done()
+            continue
+
         if not feed_name:
             logging.debug("No items in feed_queue.")
-            time.sleep(1)
-            continue
         else:
             logging.debug("New item in feed_queue.")
             feed_queue.task_done()
+            store_queue.put((feedback_queue, 'publish', feed_name, entry))
 
-        store_queue.put((feedback_queue, 'publish', feed_name, entry))
         result, feed_name, entry = feedback_queue.get()
         if not feed_name:
             logging.debug("No items in feedback_queue (nothing stored).")
-            time.sleep(1)
             continue
         else:
-            logging.debug("New item in feedback_queue (xsomething stored).")
-            feedback_queue.task_done()
+            logging.debug("New item in feedback_queue (something stored).")
+            feed_queue.task_done()
 
         if result:
             logging.debug("Entry '{0}' is new, saving.".format(entry['title']))
@@ -122,7 +127,11 @@ def main():
     store = storage.Storage()
     store.daemon = True
     store.start()
-    publisher_thread = threading.Thread(target=publisher, args=(feed_queue, store.queue, irc_queue, irc_thread.botname), name='Publisher')
+    publisher_thread = threading.Thread(
+            target=publisher,
+            args=(feed_queue, store.queue, irc_queue, irc_thread.botname),
+            name='Publisher'
+    )
     publisher_thread.start()
 
     threads = []
@@ -131,7 +140,7 @@ def main():
     threads.append(store)
     threads.append(publisher_thread)
     while not main_thread.kill_received.is_set():
-        logging.info("main_thread.kill_received IS NOT SET.")
+        logging.debug("main_thread.kill_received IS NOT SET.")
         logging.debug(str([t.name for t in threading.enumerate()]))
         time.sleep(3)
     logging.info("main_thread.kill_received IS SET. Killing Storage and exiting.")
