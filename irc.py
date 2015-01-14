@@ -8,14 +8,15 @@ from datetime import datetime
 import threading
 import logging
 import Queue
+import storage
 
 
-DEBUG = True
+DEBUG = False
 RECONNECT_TIME=5
 
 
 logging.basicConfig(
-        level=logging.DEBUG,
+        level=logging.INFO,
         format='[%(asctime)s %(levelname)s] (%(threadName)-10s) %(message)s',
 )
 
@@ -41,6 +42,7 @@ class IRCConnector(threading.Thread):
 
 
     def disconnect(self):
+        logging.debug("irc.disconnect(): my thread name is '{0}'".format(self.name))
         self.s.close()
         self.parent.kill_received.set()
         self.kill_received.set()
@@ -59,6 +61,7 @@ class IRCConnector(threading.Thread):
 
 
     def connect(self):
+        logging.debug("irc.connect(): my thread name is '{0}'".format(self.name))
         attempts = 3
         irc_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM) #Define  IRC Socket
         remote_ip = socket.gethostbyname(self.host)
@@ -91,7 +94,7 @@ class IRCConnector(threading.Thread):
 
         for chan in self.channels:
             logging.debug("Building thread for channel {0}".format(chan))
-            q = Queue.Queue(10)
+            q = Queue.Queue()
             self.channel_queues[chan] = q
             channel_thread = IRCChannel(self, self.s, chan, q)
             self.channel_threads[chan] = channel_thread
@@ -101,8 +104,8 @@ class IRCConnector(threading.Thread):
         while not self.kill_received.is_set():
             line = self.receive()
             if line:
-                self.output(line)
-                logging.debug("Number of threads alive: {0}".format(threading.active_count()))
+                #self.output(line)
+                logging.debug("Something received from IRC. Number of threads alive: {0}".format(threading.active_count()))
                 logging.debug(str([t.name for t in threading.enumerate()]))
             else:
                 continue
@@ -128,6 +131,7 @@ class IRCConnector(threading.Thread):
                 messagelist = details[3:]
                 message = " ".join(messagelist)[1:]
                 lower = message.lower().encode('utf-8')
+                logging.debug("Received a message on IRC: '{0}'".format(lower))
                 logging.debug("Putting '{0}' into channel {1} queue".format(lower, channel))
                 try:
                     self.channel_queues[channel].put((username, lower))
@@ -178,6 +182,7 @@ class IRCChannel(threading.Thread):
             else:
                 self.say(lower)
             self.queue.task_done()
+            time.sleep(1)
 
 
 def get_thread(threads, server, channel):
@@ -197,9 +202,8 @@ def get_thread(threads, server, channel):
     return None
 
 
-def put_in_queue(thread, recipient, message):
-    logging.debug('Putting values ({0}, {1}) in queue of thread {2}'.format(recipient, message, thread.queue))
-    thread.queue.put((recipient, message))
-
+def put_in_queue(producer_thread, consumer_thread, recipient, message):
+    logging.debug("Putting values ({0}, {1}) from thread '{2}' in queue of thread '{3}'".format(recipient, message, producer_thread.name, consumer_thread.name))
+    consumer_thread.queue.put((recipient, message))
 
 
