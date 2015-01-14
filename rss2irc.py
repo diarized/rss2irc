@@ -25,7 +25,8 @@ def grabber(feeds, feed_queue):
     logging.info('Entering into grabber()')
     while True:
         if DEBUG:
-            feed_queue.put(('clear_table', None))
+            for feed_name, feed_url in feeds:
+                feed_queue.put((feed_name, 'clear_table'))
 
         for feed_name, feed_url in feeds:
             logging.debug('Reading feed {0}'.format(feed_name))
@@ -49,7 +50,7 @@ def publisher(feed_queue, store_queue, irc_queue, botname):
         time.sleep(1)
         feed_name, entry = feed_queue.get()
 
-        if DEBUG and feed_name == 'clear_table': # and feed_name not in cleared_tables.keys(): # uncomment to clear once
+        if DEBUG and entry == 'clear_table': # and feed_name not in cleared_tables.keys(): # uncomment to clear once
             store_queue.put((feedback_queue, 'clear_table', feed_name, None))
             cleared_tables[feed_name] = True
             feed_queue.task_done()
@@ -68,7 +69,7 @@ def publisher(feed_queue, store_queue, irc_queue, botname):
             continue
         else:
             logging.debug("New item in feedback_queue (something stored).")
-            feed_queue.task_done()
+            feedback_queue.task_done()
 
         if result:
             logging.debug("Entry '{0}' is new, saving.".format(entry['title']))

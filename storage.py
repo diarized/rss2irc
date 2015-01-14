@@ -98,13 +98,16 @@ class Storage(threading.Thread):
     
     
     def clear_table(self, table_name):
-        logging.debug('Clearing the database.')
+        logging.debug("Clearing the table '{0}'.".format(table_name))
         try:
             self.conn.execute("DELETE FROM {0};".format(table_name))
             self.conn.commit()
         except sql.OperationalError, e:
+            logging.error("'DELETE FROM {0}' raised an exception: {1}".format(table_name, str(e)))
             if re.search('no such table', str(e)):
                 self.create_table(table_name)
+            else:
+                raise
     
 
     def run(self):
