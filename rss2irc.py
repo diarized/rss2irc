@@ -8,11 +8,13 @@ import storage
 import threading
 import Queue
 import logging
+import ConfigParser
 from pprint import pprint
 
 
 DEBUG = False
 REFRESH_TIME = 300
+CONFIG_FILE='feeds.cfg'
 
 
 logging.basicConfig(
@@ -20,26 +22,37 @@ logging.basicConfig(
         format='[%(asctime)s %(levelname)s] (%(threadName)-10s) %(message)s',
 )
 
+class Grabber(threading.Thread):
+    def __init__(self, feed_queue):
+        self.feeds = None
+        self.feed_queue = feed_queue
+        self.kill_received = threading.Event()
+        threading.Thread.__init__(self, name='Grabber')
 
-def grabber(feeds, feed_queue):
-    logging.info('Entering into grabber()')
-    while True:
-        if DEBUG:
-            for feed_name, feed_url in feeds:
-                feed_queue.put((feed_name, 'clear_table'))
 
-        for feed_name, feed_url in feeds:
-            logging.debug('Reading feed {0}'.format(feed_name))
-            raw_feed = feedparser.parse(feed_url)
-            for entry in raw_feed['entries']:
-                entry['title'] = entry['title'].encode('utf-8', 'ignore')
-                entry['link'] = entry['link'].encode('utf-8')
-                if feed_queue:
-                    logging.debug("Putting entry '{0}' into feed queue".format(entry['title']))
-                    feed_queue.put((feed_name, entry))
-                else:
-                    sys.exit()
-        time.sleep(REFRESH_TIME)
+    def run(self):
+        logging.info('Entering into grabber()')
+        while True:
+            cp = ConfigParser.ConfigParser()
+            cp.read(CONFIG_FILE)
+            self.feeds = cp.items('feeds')
+
+            if DEBUG:
+                for feed_name, feed_url in self.feeds:
+                    self.feed_queue.put((feed_name, 'clear_table'))
+    
+            for feed_name, feed_url in self.feeds:
+                logging.debug('Reading feed {0}'.format(feed_name))
+                raw_feed = feedparser.parse(feed_url)
+                for entry in raw_feed['entries']:
+                    entry['title'] = entry['title'].encode('utf-8', 'ignore')
+                    entry['link'] = entry['link'].encode('utf-8')
+                    if self.feed_queue:
+                        logging.debug("Putting entry '{0}' into feed queue".format(entry['title']))
+                        self.feed_queue.put((feed_name, entry))
+                    else:
+                        sys.exit()
+            time.sleep(REFRESH_TIME)
 
 
 def publisher(feed_queue, store_queue, irc_queue, botname):
@@ -93,17 +106,13 @@ def main():
     port = 6667
     channel = '#999net'
     channels = [channel]
-    feeds = [
-        ('HN', 'https://news.ycombinator.com/rss'),
-        ('TorrentFreak', 'http://feeds.feedburner.com/Torrentfreak')
-    ]
     feed_queue = Queue.Queue()
 
     # Satisfying IRCConnector interface
     main_thread = threading.current_thread()
     main_thread.kill_received = threading.Event()
 
-    grabber_thread = threading.Thread(target=grabber, args=(feeds, feed_queue), name='Grabber')
+    grabber_thread = Grabber(feed_queue)
     grabber_thread.daemon = True
     grabber_thread.start()
 
@@ -143,10 +152,10 @@ def main():
     while not main_thread.kill_received.is_set():
         logging.debug("main_thread.kill_received IS NOT SET.")
         logging.debug(str([t.name for t in threading.enumerate()]))
-        time.sleep(3)
+        time.sleep(1)
     logging.info("main_thread.kill_received IS SET. Killing Storage and exiting.")
     store.kill_received.set()
-    feed_queue = None # Exit condition for Grabber
+    grabber_thread.kill_received.set()
 
 
 if __name__ == '__main__':
