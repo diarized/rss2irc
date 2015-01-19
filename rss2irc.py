@@ -22,6 +22,7 @@ logging.basicConfig(
         format='[%(asctime)s %(levelname)s] (%(threadName)-10s) %(message)s',
 )
 
+
 class Grabber(threading.Thread):
     def __init__(self, feed_queue):
         self.feeds = None
@@ -32,7 +33,7 @@ class Grabber(threading.Thread):
 
     def run(self):
         logging.info('Entering into grabber()')
-        while True:
+        while not self.kill_receiverd.is_set():
             cp = ConfigParser.ConfigParser()
             cp.read(CONFIG_FILE)
             self.feeds = cp.items('feeds')
@@ -55,52 +56,63 @@ class Grabber(threading.Thread):
             time.sleep(REFRESH_TIME)
 
 
-def publisher(feed_queue, store_queue, irc_queue, botname):
-    logging.info('Entering into publisher()')
-    feedback_queue = Queue.Queue()
-    cleared_tables = {}
-    while True:
-        time.sleep(1)
-        feed_name, entry = feed_queue.get()
 
-        if DEBUG and entry == 'clear_table': # and feed_name not in cleared_tables.keys(): # uncomment to clear once
-            store_queue.put((feedback_queue, 'clear_table', feed_name, None))
-            cleared_tables[feed_name] = True
-            feed_queue.task_done()
-            continue
+class Publisher(threading.Thread):
+    def __init__(self, feed_queue, store_queue, irc_queue, botname):
+        self.feed_queue = feed_queue
+        self.store_queue = store_queue
+        self.irc_queue = irc_queue
+        self.botname = botname
+        self.kill_received = threading.Event()
+        threading.Thread.__init__(self, name='Publisher')
 
-        if not feed_name:
-            logging.debug("No items in feed_queue.")
-        else:
-            logging.debug("New item in feed_queue.")
-            feed_queue.task_done()
-            store_queue.put((feedback_queue, 'publish', feed_name, entry))
 
-        result, feed_name, entry = feedback_queue.get()
-        if not feed_name:
-            logging.debug("No items in feedback_queue (nothing stored).")
-            continue
-        else:
-            logging.debug("New item in feedback_queue (something stored).")
-            feedback_queue.task_done()
-
-        if result:
-            logging.debug("Entry '{0}' is new, saving.".format(entry['title']))
-            irc_queue.put(
-                    (
-                        botname,
-                        ' | '.join([
-                                    feed_name,
-                                    entry['title'],
-                                    entry['link']
-                        ])
-                    )
-            )
+    def run(self):
+        logging.info('Entering into publisher()')
+        feedback_queue = Queue.Queue()
+        cleared_tables = {}
+        while not self.kill_received.is_set():
             time.sleep(1)
-        else:
-            logging.debug("Entry '{0}' already saved.".format(entry['title']))
-
-
+            feed_name, entry = self.feed_queue.get()
+    
+            if DEBUG and entry == 'clear_table': # and feed_name not in cleared_tables.keys(): # uncomment to clear once
+                self.store_queue.put((feedback_queue, 'clear_table', feed_name, None))
+                cleared_tables[feed_name] = True
+                self.feed_queue.task_done()
+                continue
+    
+            if not feed_name:
+                logging.debug("No items in feed_queue.")
+            else:
+                logging.debug("New item in feed_queue.")
+                self.feed_queue.task_done()
+                self.store_queue.put((feedback_queue, 'publish', feed_name, entry))
+    
+            result, feed_name, entry = feedback_queue.get()
+            if not feed_name:
+                logging.debug("No items in feedback_queue (nothing stored).")
+                continue
+            else:
+                logging.debug("New item in feedback_queue (something stored).")
+                feedback_queue.task_done()
+    
+            if result:
+                logging.debug("Entry '{0}' is new, saving.".format(entry['title']))
+                self.irc_queue.put(
+                        (
+                            self.botname,
+                            ' | '.join([
+                                        feed_name,
+                                        entry['title'],
+                                        entry['link']
+                            ])
+                        )
+                )
+                time.sleep(1)
+            else:
+                logging.debug("Entry '{0}' already saved.".format(entry['title']))
+    
+    
 def main():
     host = 'irc.freenode.net'
     port = 6667
@@ -137,11 +149,7 @@ def main():
     store = storage.Storage()
     store.daemon = True
     store.start()
-    publisher_thread = threading.Thread(
-            target=publisher,
-            args=(feed_queue, store.queue, irc_queue, irc_thread.botname),
-            name='Publisher'
-    )
+    publisher_thread = Publisher(feed_queue, store.queue, irc_queue, irc_thread.botname)
     publisher_thread.start()
 
     threads = []
@@ -156,6 +164,7 @@ def main():
     logging.info("main_thread.kill_received IS SET. Killing Storage and exiting.")
     store.kill_received.set()
     grabber_thread.kill_received.set()
+    publisher_thread.kill_received.set()
 
 
 if __name__ == '__main__':
