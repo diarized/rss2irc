@@ -6,11 +6,16 @@ import sys
 import re
 
 
-DEBUG = False
+DEBUG = True
 
+
+if DEBUG:
+    loglevel = logging.DEBUG
+else:
+    loglevel = logging.INFO
 
 logging.basicConfig(
-        level=logging.INFO,
+        level=loglevel,
         format='[%(asctime)s %(levelname)s] (%(threadName)-10s) %(message)s',
 )
 

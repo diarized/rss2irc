@@ -11,12 +11,16 @@ import Queue
 import storage
 
 
-DEBUG = False
+DEBUG = storage.DEBUG
 RECONNECT_TIME=5
 
+if DEBUG:
+    loglevel = logging.DEBUG
+else:
+    loglevel = logging.INFO
 
 logging.basicConfig(
-        level=logging.INFO,
+        level=loglevel,
         format='[%(asctime)s %(levelname)s] (%(threadName)-10s) %(message)s',
 )
 
@@ -177,8 +181,10 @@ class IRCChannel(threading.Thread):
                 self.say(message, self.channel_name)
             elif lower == "$date":
                 self.say("{0}: the time is {1}".format(username, datetime.now()))
-            elif lower== "$kill":
+            elif lower == "$kill":
                 self.disconnect()
+            elif lower == "$debug":
+                DEBUG = True
             else:
                 self.say(lower)
             self.queue.task_done()

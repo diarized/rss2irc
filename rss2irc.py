@@ -12,13 +12,17 @@ import ConfigParser
 from pprint import pprint
 
 
-DEBUG = False
-REFRESH_TIME = 300
+REFRESH_TIME = 100
 CONFIG_FILE='feeds.cfg'
 
 
+if storage.DEBUG:
+    loglevel = logging.DEBUG
+else:
+    loglevel = logging.INFO
+
 logging.basicConfig(
-        level=logging.INFO,
+        level=loglevel,
         format='[%(asctime)s %(levelname)s] (%(threadName)-10s) %(message)s',
 )
 
@@ -33,12 +37,12 @@ class Grabber(threading.Thread):
 
     def run(self):
         logging.info('Entering into grabber()')
-        while not self.kill_receiverd.is_set():
+        while not self.kill_received.is_set():
             cp = ConfigParser.ConfigParser()
             cp.read(CONFIG_FILE)
             self.feeds = cp.items('feeds')
 
-            if DEBUG:
+            if storage.DEBUG:
                 for feed_name, feed_url in self.feeds:
                     self.feed_queue.put((feed_name, 'clear_table'))
     
@@ -54,6 +58,7 @@ class Grabber(threading.Thread):
                     else:
                         sys.exit()
             time.sleep(REFRESH_TIME)
+        logging.debug('Grabber: kill_received set.')
 
 
 
@@ -75,7 +80,7 @@ class Publisher(threading.Thread):
             time.sleep(1)
             feed_name, entry = self.feed_queue.get()
     
-            if DEBUG and entry == 'clear_table': # and feed_name not in cleared_tables.keys(): # uncomment to clear once
+            if storage.DEBUG and entry == 'clear_table': # and feed_name not in cleared_tables.keys(): # uncomment to clear once
                 self.store_queue.put((feedback_queue, 'clear_table', feed_name, None))
                 cleared_tables[feed_name] = True
                 self.feed_queue.task_done()
@@ -111,6 +116,7 @@ class Publisher(threading.Thread):
                 time.sleep(1)
             else:
                 logging.debug("Entry '{0}' already saved.".format(entry['title']))
+        logging.debug('Publisher: kill_received set.')
     
     
 def main():
@@ -118,7 +124,7 @@ def main():
     port = 6667
     channel = '#999net'
     channels = [channel]
-    feed_queue = Queue.Queue()
+    feed_queue = Queue.Queue(100)
 
     # Satisfying IRCConnector interface
     main_thread = threading.current_thread()
@@ -160,11 +166,14 @@ def main():
     while not main_thread.kill_received.is_set():
         logging.debug("main_thread.kill_received IS NOT SET.")
         logging.debug(str([t.name for t in threading.enumerate()]))
+        if irc_thread.kill_received.is_set():
+            store.kill_received.set()
+            grabber_thread.kill_received.set()
+            publisher_thread.kill_received.set()
+            break
         time.sleep(1)
     logging.info("main_thread.kill_received IS SET. Killing Storage and exiting.")
-    store.kill_received.set()
-    grabber_thread.kill_received.set()
-    publisher_thread.kill_received.set()
+    logging.debug(str([t.name for t in threading.enumerate()]))
 
 
 if __name__ == '__main__':
