@@ -39,6 +39,7 @@ class Grabber(threading.Thread):
 
     def run(self):
         logging.info('Entering into grabber()')
+        old_storage_debug = storage.DEBUG
         while not self.kill_received.is_set():
             if datetime.datetime.now().second % 5 == 0:
                 logging.debug("Grabber.kill_received NOT SET.")
@@ -46,6 +47,18 @@ class Grabber(threading.Thread):
             cp = ConfigParser.ConfigParser()
             cp.read(CONFIG_FILE)
             self.feeds = cp.items('feeds')
+
+            if old_storage_debug != storage.DEBUG:
+                self.feed_queue.put(
+                        (
+                            'INTERNAL', # feed_name
+                            {           # entry
+                                'title': 'storage.DEBUG changed to ',
+                                'link': str(storage.DEBUG)
+                            }
+                        )
+                )
+                old_storage_debug = storage.DEBUG
 
             if storage.DEBUG:
                 for feed_name, feed_url in self.feeds:

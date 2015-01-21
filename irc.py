@@ -183,7 +183,9 @@ class IRCChannel(threading.Thread):
             elif lower == "$kill":
                 self.disconnect()
             elif lower == "$debug":
+                self.say("storage.DEBUG = {}".format(storage.DEBUG), self.channel_name)
                 storage.DEBUG = not storage.DEBUG
+                self.say("$debug received. storage.DEBUG = {}".format(storage.DEBUG), self.channel_name)
             else:
                 self.say(lower)
             self.queue.task_done()
