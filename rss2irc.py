@@ -3,6 +3,7 @@
 
 import feedparser
 import time
+import datetime
 import irc
 import storage
 import threading
@@ -38,6 +39,9 @@ class Grabber(threading.Thread):
     def run(self):
         logging.info('Entering into grabber()')
         while not self.kill_received.is_set():
+            if datetime.datetime.now().second % 5 == 0:
+                logging.debug("Grabber.kill_received NOT SET.")
+                logging.debug(str([t.name for t in threading.enumerate()]))
             cp = ConfigParser.ConfigParser()
             cp.read(CONFIG_FILE)
             self.feeds = cp.items('feeds')
@@ -77,6 +81,9 @@ class Publisher(threading.Thread):
         feedback_queue = Queue.Queue()
         cleared_tables = {}
         while not self.kill_received.is_set():
+            if datetime.datetime.now().second % 5 == 0:
+                logging.debug("Publisher.kill_received NOT SET.")
+                logging.debug(str([t.name for t in threading.enumerate()]))
             time.sleep(1)
             feed_name, entry = self.feed_queue.get()
     

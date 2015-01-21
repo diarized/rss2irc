@@ -11,10 +11,9 @@ import Queue
 import storage
 
 
-DEBUG = storage.DEBUG
 RECONNECT_TIME=5
 
-if DEBUG:
+if storage.DEBUG:
     loglevel = logging.DEBUG
 else:
     loglevel = logging.INFO
@@ -184,7 +183,7 @@ class IRCChannel(threading.Thread):
             elif lower == "$kill":
                 self.disconnect()
             elif lower == "$debug":
-                DEBUG = True
+                storage.DEBUG = not storage.DEBUG
             else:
                 self.say(lower)
             self.queue.task_done()

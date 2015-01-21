@@ -49,7 +49,7 @@ class Storage(threading.Thread):
 
     def create_table(self, table_name):
         logging.warning('No table {0}. To be created.'.format(table_name))
-        self.conn.execute('CREATE TABLE {0} (title TEXT PRIMARY KEY, link TEXT, published BOOLEAN);'.format(table_name))
+        self.conn.execute('CREATE TABLE {0} (title TEXT, link TEXT PRIMARY KEY, published BOOLEAN);'.format(table_name))
         self.conn.commit()
         self.conn.execute('CREATE UNIQUE INDEX {0} ON {1} (title, link);'.format(table_name + '_index', table_name))
         self.conn.commit()
