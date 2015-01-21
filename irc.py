@@ -176,16 +176,16 @@ class IRCChannel(threading.Thread):
             username, lower = self.queue.get()
             logging.debug("Read ('{0}', '{1}') from queue in thread {2}".format(username, lower, self.name))
             if re.search("hello.*sprbt", lower):
-                message = "Hello there, %s" %username
-                self.say(message, self.channel_name)
+                message = "Hello there, %s" % username
+                self.say(message)
             elif lower == "$date":
                 self.say("{0}: the time is {1}".format(username, datetime.now()))
             elif lower == "$kill":
                 self.disconnect()
             elif lower == "$debug":
-                self.say("storage.DEBUG = {}".format(storage.DEBUG), self.channel_name)
+                self.say("storage.DEBUG = {}".format(storage.DEBUG))
                 storage.DEBUG = not storage.DEBUG
-                self.say("$debug received. storage.DEBUG = {}".format(storage.DEBUG), self.channel_name)
+                self.say("$debug received. storage.DEBUG = {}".format(storage.DEBUG))
             else:
                 self.say(lower)
             self.queue.task_done()

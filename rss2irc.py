@@ -110,6 +110,14 @@ class Publisher(threading.Thread):
     
             if not feed_name:
                 logging.debug("No items in feed_queue.")
+            elif feed_name == 'DIRECT_MESSAGE':
+                message = entry
+                self.irc_queue.put(
+                    (
+                        self.botname,
+                        message,
+                    )
+                )
             else:
                 logging.debug("New item in feed_queue.")
                 self.feed_queue.task_done()
