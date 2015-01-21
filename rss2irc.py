@@ -10,6 +10,7 @@ import threading
 import Queue
 import logging
 import ConfigParser
+import sys
 from pprint import pprint
 
 
@@ -59,10 +60,11 @@ class Grabber(threading.Thread):
                     if self.feed_queue:
                         logging.debug("Putting entry '{0}' into feed queue".format(entry['title']))
                         self.feed_queue.put((feed_name, entry))
-                    else:
-                        sys.exit()
+                    #else:
+                    #    sys.exit()
             time.sleep(REFRESH_TIME)
         logging.debug('Grabber: kill_received set.')
+        sys.exit()
 
 
 
@@ -124,6 +126,7 @@ class Publisher(threading.Thread):
             else:
                 logging.debug("Entry '{0}' already saved.".format(entry['title']))
         logging.debug('Publisher: kill_received set.')
+        sys.exit()
     
     
 def main():
@@ -170,16 +173,15 @@ def main():
     threads.append(irc_thread)
     threads.append(store)
     threads.append(publisher_thread)
-    while not main_thread.kill_received.is_set():
-        logging.debug("main_thread.kill_received IS NOT SET.")
+    while not irc_thread.kill_received.is_set():
+        logging.debug("irc_thread.kill_received IS NOT SET.")
         logging.debug(str([t.name for t in threading.enumerate()]))
-        if irc_thread.kill_received.is_set():
-            store.kill_received.set()
-            grabber_thread.kill_received.set()
-            publisher_thread.kill_received.set()
-            break
         time.sleep(1)
-    logging.info("main_thread.kill_received IS SET. Killing Storage and exiting.")
+    logging.info("irc_thread.kill_received IS SET. Killing all threads and exiting.")
+    store.kill_received.set()
+    grabber_thread.kill_received.set()
+    publisher_thread.kill_received.set()
+    time.sleep(1)
     logging.debug(str([t.name for t in threading.enumerate()]))
 
 

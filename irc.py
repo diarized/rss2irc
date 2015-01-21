@@ -47,7 +47,7 @@ class IRCConnector(threading.Thread):
     def disconnect(self):
         logging.debug("irc.disconnect(): my thread name is '{0}'".format(self.name))
         self.s.close()
-        self.parent.kill_received.set()
+        #self.parent.kill_received.set()
         self.kill_received.set()
         sys.exit()
 

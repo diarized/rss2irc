@@ -103,6 +103,7 @@ class Storage(threading.Thread):
     
     
     def clear_table(self, table_name):
+        return
         logging.debug("Clearing the table '{0}'.".format(table_name))
         try:
             self.conn.execute("DELETE FROM {0};".format(table_name))
@@ -137,5 +138,6 @@ class Storage(threading.Thread):
             else:
                 logging.error("Unknown action '{0}' from Feeder to Storage".format(action))
             self.queue.task_done()
+        sys.exit()
 
 
