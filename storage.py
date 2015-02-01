@@ -6,7 +6,7 @@ import sys
 import re
 
 
-DEBUG = True
+DEBUG = False
 
 
 if DEBUG:

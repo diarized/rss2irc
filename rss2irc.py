@@ -51,8 +51,8 @@ class Grabber(threading.Thread):
             if old_storage_debug != storage.DEBUG:
                 self.feed_queue.put(
                         (
-                            'INTERNAL', # feed_name
-                            {           # entry
+                            'DIRECT_MESSAGE',   # feed_name
+                            {                   # entry
                                 'title': 'storage.DEBUG changed to ',
                                 'link': str(storage.DEBUG)
                             }
@@ -73,8 +73,6 @@ class Grabber(threading.Thread):
                     if self.feed_queue:
                         logging.debug("Putting entry '{0}' into feed queue".format(entry['title']))
                         self.feed_queue.put((feed_name, entry))
-                    #else:
-                    #    sys.exit()
             time.sleep(REFRESH_TIME)
         logging.debug('Grabber: kill_received set.')
         sys.exit()
