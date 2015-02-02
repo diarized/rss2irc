@@ -1,8 +1,10 @@
 import ConfigParser
+import pprint
+import grabber
 
 def list(arg=None):
     cp = ConfigParser.ConfigParser()
-    cp.read(CONFIG_FILE)
+    cp.read(grabber.CONFIG_FILE)
     feeds = cp.items('feeds')
-    return feeds.replace('\n', ' ')
+    return pprint.pformat(feeds).replace('\n', ' ')
 
