@@ -9,6 +9,7 @@ import threading
 import logging
 import Queue
 import storage
+import irc_plugins
 
 
 RECONNECT_TIME=5
@@ -39,10 +40,16 @@ class IRCConnector(threading.Thread):
         self.kill_received = threading.Event()
         threading.Thread.__init__(self, name=host)
 
+    def broadcast(self, from_user, where, what):
+        if not where in self.channel_queues:
+            return False
+        if len(what) > 500:
+            return False
+        self.channel_queues[where].put((from_user, what))
+        return True
 
     def output(self, message):
         logging.info("Server: %s\nMessage:%s\n" % (self.host, message))
-
 
     def disconnect(self):
         logging.debug("irc.disconnect(): my thread name is '{0}'".format(self.name))
@@ -50,7 +57,6 @@ class IRCConnector(threading.Thread):
         #self.parent.kill_received.set()
         self.kill_received.set()
         sys.exit()
-
 
     def receive(self):
             try:
@@ -61,7 +67,6 @@ class IRCConnector(threading.Thread):
             if line:
                 return line
             return None
-
 
     def connect(self):
         logging.debug("irc.connect(): my thread name is '{0}'".format(self.name))
@@ -187,6 +192,19 @@ class IRCChannel(threading.Thread):
                 storage.DEBUG = not storage.DEBUG
                 self.say("$debug received. storage.DEBUG = {}".format(storage.DEBUG))
             else:
-                self.say(lower)
+                groups = re.match("(.+?) (.*)", lower)
+                try:
+                    command = groups.groups()
+                except AttributeError:
+                    plugin, argument = lower, None
+                else:
+                    plugin, argument = command
+                try:
+                    plugin_to_call = getattr(irc_plugins, plugin)
+                except AttributeError:
+                    self.say("No plugin for " + lower)
+                else:
+                    response = irc_plugins.plugin_to_call(argument)
+                    self.say(response)
             self.queue.task_done()
-            time.sleep(1)
+            time.sleep(0.5)
