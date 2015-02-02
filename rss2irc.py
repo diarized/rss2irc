@@ -1,5 +1,6 @@
 #!/usr/bin/env python
 
+import argparse
 import time
 import datetime
 import irc
@@ -24,10 +25,22 @@ logging.basicConfig(
 
     
 def main():
-    host = 'irc.freenode.net'
-    port = 6667
-    channel = '#999net'
+    parser = argparse.ArgumentParser(description='Irc Bot.')
+    parser.add_argument('--server', dest='server', help='IRC server')
+    parser.add_argument('--channel', dest='channel', help='IRC channel')
+    args = parser.parse_args()
+    if args.server:
+        host = parser.server
+    else:
+        host = 'irc.freenode.net'
+    if args.channel:
+        channel = args.channel
+        if not channel.startswith('#'):
+            channel = '#' + channel
+    else:
+        channel = '#999net'
     channels = [channel]
+    port = 6667
     feed_queue = Queue.Queue(100)
 
     # Satisfying IRCConnector interface

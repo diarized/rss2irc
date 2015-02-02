@@ -202,7 +202,7 @@ class IRCChannel(threading.Thread):
                 try:
                     plugin_to_call = getattr(irc_plugins, plugin)
                 except AttributeError:
-                    self.say("No plugin for " + lower)
+                    self.say(lower)
                 else:
                     response = plugin_to_call(argument)
                     self.say(response)
