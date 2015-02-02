@@ -190,27 +190,3 @@ class IRCChannel(threading.Thread):
                 self.say(lower)
             self.queue.task_done()
             time.sleep(1)
-
-
-def get_thread(threads, server, channel):
-    for irc_thread in threads:
-        logging.debug('Seeking IRC thread {0} for channel threads'.format(irc_thread.name))
-        if irc_thread.host == server:
-            logging.debug('Found thread on IRC server {0}'.format(server))
-            try:
-                chan_thread = irc_thread.channel_threads[channel]
-            except KeyError:
-                logging.debug('No channel {0} on server {1}'.format(channel, server))
-                pass
-            else:
-                logging.debug('Found thread {0} on IRC server {1}'.format(channel, server))
-                return (chan_thread, irc_thread.botname)
-    logging.debug('Thread on IRC server {0} not found'.format(server))
-    return None
-
-
-def put_in_queue(producer_thread, consumer_thread, recipient, message):
-    logging.debug("Putting values ({0}, {1}) from thread '{2}' in queue of thread '{3}'".format(recipient, message, producer_thread.name, consumer_thread.name))
-    consumer_thread.queue.put((recipient, message))
-
-
