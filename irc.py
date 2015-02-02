@@ -204,7 +204,7 @@ class IRCChannel(threading.Thread):
                 except AttributeError:
                     self.say("No plugin for " + lower)
                 else:
-                    response = irc_plugins.plugin_to_call(argument)
+                    response = plugin_to_call(argument)
                     self.say(response)
             self.queue.task_done()
             time.sleep(0.5)
