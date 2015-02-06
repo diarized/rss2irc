@@ -10,7 +10,6 @@ import publisher
 import threading
 import Queue
 import logging
-import sys
 from pprint import pprint
 
 if storage.DEBUG:
