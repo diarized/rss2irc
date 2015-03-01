@@ -3,7 +3,7 @@
 import argparse
 import time
 import datetime
-import irc
+import ircc
 import storage
 import grabber
 import publisher
