@@ -29,7 +29,7 @@ def main():
     parser.add_argument('--channel', dest='channel', help='IRC channel')
     args = parser.parse_args()
     if args.server:
-        host = parser.server
+        host = args.server
     else:
         host = 'irc.freenode.net'
     if args.channel:
@@ -50,7 +50,7 @@ def main():
     grabber_thread.daemon = True
     grabber_thread.start()
 
-    irc_thread = irc.IRCConnector(main_thread, host, port, channels)
+    irc_thread = ircc.IRCConnector(main_thread, host, port, channels)
     irc_thread.daemon = True
     irc_thread.start()
 
