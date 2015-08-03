@@ -52,6 +52,8 @@ class Storage(threading.Thread):
         self.conn.commit()
         self.conn.execute('CREATE UNIQUE INDEX {0} ON {1} (title, link);'.format(table_name + '_index', table_name))
         self.conn.commit()
+        self.conn.execute('CREATE UNIQUE INDEX {0} ON {1} (link);'.format(table_name + '_index_link', table_name))
+        self.conn.commit()
 
 
     def insert(self, table_name, entry):
@@ -116,7 +118,7 @@ class Storage(threading.Thread):
     
 
     def run(self):
-        logging.debug("I am into 'storage.Storage.run()")
+        logging.debug("I am in 'storage.Storage.run()")
         self.connect()
         while not self.kill_received.is_set():
             feedback_queue, action, feed_name, entry = self.queue.get()

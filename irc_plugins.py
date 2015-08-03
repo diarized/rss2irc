@@ -8,3 +8,5 @@ def list(arg=None):
     feeds = cp.items('feeds')
     return pprint.pformat(feeds).replace('\n', ' ')
 
+def search(arg):
+    return "Searched for {}".format(arg)

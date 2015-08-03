@@ -200,6 +200,7 @@ class IRCChannel(threading.Thread):
                 else:
                     plugin, argument = command
                 try:
+                    logging.debug("Trying to call plugin {} with argument {}".format(plugin, argument))
                     plugin_to_call = getattr(irc_plugins, plugin)
                 except AttributeError:
                     self.say(lower)
